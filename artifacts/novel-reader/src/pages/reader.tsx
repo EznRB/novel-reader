@@ -2,20 +2,18 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Play, Pause, Square, ChevronLeft, ChevronRight,
-  MessageSquare, BookOpen, FileText, Sparkles, Settings2,
-  Volume2, Loader2, X,
+  ArrowLeft, ChevronLeft, ChevronRight, MessageSquare,
+  Sparkles, X, Loader2, Settings2, Sun, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   useGetChapter,
@@ -29,143 +27,38 @@ import {
   getGetChapterSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { AudioPlayer, type Voice } from "@/components/audio-player";
 
-/* ── TTS Hook ── */
-function useTTS(text: string, speed: number, voiceURI: string | null) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [wordIndex, setWordIndex] = useState(-1);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const wordsRef = useRef<string[]>([]);
-
-  useEffect(() => {
-    wordsRef.current = text.split(/\s+/).filter(Boolean);
-  }, [text]);
-
-  const stop = useCallback(() => {
-    window.speechSynthesis.cancel();
-    setIsPlaying(false);
-    setWordIndex(-1);
-  }, []);
-
-  const play = useCallback(() => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = speed;
-
-    if (voiceURI) {
-      const voices = window.speechSynthesis.getVoices();
-      const v = voices.find((v) => v.voiceURI === voiceURI);
-      if (v) utterance.voice = v;
-    }
-
-    let wordCount = 0;
-    utterance.onboundary = (e) => {
-      if (e.name === "word") {
-        setWordIndex(wordCount);
-        wordCount++;
-      }
-    };
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setWordIndex(-1);
-    };
-    utterance.onerror = () => {
-      setIsPlaying(false);
-      setWordIndex(-1);
-    };
-
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setIsPlaying(true);
-  }, [text, speed, voiceURI]);
-
-  const pause = useCallback(() => {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.pause();
-      setIsPlaying(false);
-    }
-  }, []);
-
-  const resume = useCallback(() => {
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-      setIsPlaying(true);
-    } else {
-      play();
-    }
-  }, [play]);
-
-  useEffect(() => () => { window.speechSynthesis.cancel(); }, []);
-
-  return { isPlaying, wordIndex, play, pause, resume, stop };
+/* ── Sentence splitter ── */
+function splitSentences(text: string): string[] {
+  if (!text) return [];
+  const raw = text
+    .split(/(?<=[.!?…"'»])\s+(?=[A-ZÁÉÍÓÚÀÂÊÔÃÕÇÜÑ"'«\d])/)
+    .flatMap((s) => s.split(/\n{2,}/))
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return raw.length ? raw : [text.trim()];
 }
 
-/* ── Chapter Text Component ── */
-function ChapterText({ content, wordIndex }: { content: string; wordIndex: number }) {
-  const words = content.split(/(\s+)/);
-  const wordElements = useRef<(HTMLSpanElement | null)[]>([]);
-  let realWordIdx = 0;
+/* ── Reader Theme types ── */
+type ReaderTheme = "dark" | "sepia" | "light";
+type ReaderFont = "serif" | "sans";
 
-  useEffect(() => {
-    if (wordIndex >= 0 && wordElements.current[wordIndex]) {
-      wordElements.current[wordIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [wordIndex]);
+const THEME_CLASSES: Record<ReaderTheme, string> = {
+  dark: "",
+  sepia: "reader-sepia",
+  light: "reader-light",
+};
 
-  return (
-    <div className="prose-reading max-w-2xl mx-auto">
-      {words.map((token, i) => {
-        if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
-        const idx = realWordIdx++;
-        const isActive = idx === wordIndex;
-        return (
-          <span
-            key={i}
-            ref={(el) => { wordElements.current[idx] = el; }}
-            className={`transition-all duration-100 ${isActive ? "tts-word-current" : ""}`}
-          >
-            {token}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
+const THEME_BG: Record<ReaderTheme, string> = {
+  dark: "bg-[#0f1117]",
+  sepia: "bg-[#f5ead0]",
+  light: "bg-white",
+};
 
-/* ── Voice Selector ── */
-function VoiceSelector({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-
-  useEffect(() => {
-    const load = () => setVoices(window.speechSynthesis.getVoices());
-    load();
-    window.speechSynthesis.onvoiceschanged = load;
-    return () => { window.speechSynthesis.onvoiceschanged = null; };
-  }, []);
-
-  if (voices.length === 0) return null;
-
-  return (
-    <Select value={value ?? ""} onValueChange={onChange}>
-      <SelectTrigger className="h-8 text-xs w-44" data-testid="select-voice">
-        <SelectValue placeholder="Select voice" />
-      </SelectTrigger>
-      <SelectContent>
-        {voices.map((v) => (
-          <SelectItem key={v.voiceURI} value={v.voiceURI} className="text-xs">
-            {v.name} ({v.lang})
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-/* ── Summary Panel ── */
+/* ── Summary panel ── */
 function SummaryPanel({ bookId, chapterNumber, onClose }: {
-  bookId: number;
-  chapterNumber: number;
-  onClose: () => void;
+  bookId: number; chapterNumber: number; onClose: () => void;
 }) {
   const { data: summary, isLoading } = useGetChapterSummary(bookId, chapterNumber, {
     query: { queryKey: getGetChapterSummaryQueryKey(bookId, chapterNumber) },
@@ -173,31 +66,28 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 320 }}
+      initial={{ opacity: 0, x: 340 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 320 }}
-      className="fixed top-0 right-0 h-full w-80 bg-card border-l border-card-border shadow-xl z-30 flex flex-col"
+      exit={{ opacity: 0, x: 340 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className="fixed top-0 right-0 h-full w-80 bg-card border-l border-border shadow-2xl z-40 flex flex-col"
     >
-      <div className="flex items-center justify-between p-4 border-b border-border">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
-          <h3 className="font-serif font-semibold text-sm">Chapter Summary</h3>
+          <span className="font-semibold text-sm">AI Summary</span>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} data-testid="btn-close-summary">
-          <X className="w-4 h-4" />
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+          <X className="w-3.5 h-3.5" />
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
         {isLoading ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-4">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Generating summary...</span>
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-4">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generating summary…</span>
             </div>
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-4/5" />
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className={`h-3 ${i % 3 === 0 ? "w-3/4" : "w-full"}`} />)}
           </div>
         ) : summary ? (
           <p className="text-sm leading-relaxed text-foreground whitespace-pre-line" data-testid="text-summary">
@@ -211,18 +101,109 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
   );
 }
 
-/* ── Main Reader Page ── */
+/* ── Reading settings popover ── */
+function ReaderSettings({
+  fontSize, onFontSize, lineHeight, onLineHeight,
+  theme, onTheme, font, onFont,
+}: {
+  fontSize: number; onFontSize: (n: number) => void;
+  lineHeight: number; onLineHeight: (n: number) => void;
+  theme: ReaderTheme; onTheme: (t: ReaderTheme) => void;
+  font: ReaderFont; onFont: (f: ReaderFont) => void;
+}) {
+  return (
+    <div className="space-y-4 w-64 p-1">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Font size</p>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-serif">A</span>
+          <Slider value={[fontSize]} min={14} max={26} step={1} onValueChange={([v]) => onFontSize(v)} className="flex-1" />
+          <span className="text-lg font-serif">A</span>
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Line spacing</p>
+        <div className="flex items-center gap-3">
+          <Slider value={[lineHeight]} min={1.4} max={2.4} step={0.1} onValueChange={([v]) => onLineHeight(v)} className="flex-1" />
+          <span className="text-xs text-muted-foreground w-8">{lineHeight.toFixed(1)}</span>
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Font</p>
+        <div className="flex gap-2">
+          {(["serif", "sans"] as ReaderFont[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => onFont(f)}
+              className={`flex-1 py-1.5 rounded text-sm border transition-colors ${
+                font === f ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f === "serif" ? <span className="font-serif">Serif</span> : <span className="font-sans">Sans</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Background</p>
+        <div className="flex gap-2">
+          {([
+            { key: "dark", label: "Dark", bg: "bg-[#0f1117]", text: "text-white" },
+            { key: "sepia", label: "Sepia", bg: "bg-[#f5ead0]", text: "text-amber-900" },
+            { key: "light", label: "Light", bg: "bg-white", text: "text-gray-900" },
+          ] as const).map(({ key, label, bg, text }) => (
+            <button
+              key={key}
+              onClick={() => onTheme(key)}
+              className={`flex-1 py-1.5 rounded text-xs border transition-all ${bg} ${text} ${
+                theme === key ? "border-primary ring-1 ring-primary" : "border-border"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Voice fetch hook ── */
+function useVoices() {
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    fetch(`${base}/api/tts/voices`)
+      .then((r) => r.json())
+      .then((data: Voice[]) => setVoices(data))
+      .catch(() => setVoices([]))
+      .finally(() => setLoading(false));
+  }, []);
+  return { voices, loading };
+}
+
+/* ── Main reader ── */
 export default function ReaderPage({ params }: { params: { id: string; num: string } }) {
   const bookId = parseInt(params.id, 10);
   const chapterNumber = parseInt(params.num, 10);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const [speed, setSpeed] = useState(1);
-  const [voiceURI, setVoiceURI] = useState<string | null>(null);
+  // Reader settings
+  const [fontSize, setFontSize] = useState(18);
+  const [lineHeight, setLineHeight] = useState(1.9);
+  const [theme, setTheme] = useState<ReaderTheme>("dark");
+  const [font, setFont] = useState<ReaderFont>("serif");
   const [showSummary, setShowSummary] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [fontSize, setFontSize] = useState(18);
+  const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // TTS state
+  const [currentSentence, setCurrentSentence] = useState(0);
+  const [voice, setVoice] = useState("en-US-AriaNeural");
+  const [rate, setRate] = useState(0);
+  const { voices, loading: voicesLoading } = useVoices();
 
   const { data: book } = useGetBook(bookId, {
     query: { enabled: !!bookId, queryKey: getGetBookQueryKey(bookId) },
@@ -233,235 +214,255 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const { data: progress } = useGetReadingProgress(bookId, {
     query: { enabled: !!bookId, queryKey: getGetReadingProgressQueryKey(bookId) },
   });
-
   const updateProgress = useUpdateReadingProgress();
 
-  const content = chapter?.content ?? "";
-  const { isPlaying, wordIndex, play, pause, resume, stop } = useTTS(content, speed, voiceURI);
+  const sentences = chapter?.content ? splitSentences(chapter.content) : [];
+  const totalChapters = book?.totalChapters ?? 0;
 
-  // Auto-save progress when reading
+  // Reset sentence index on chapter change
   useEffect(() => {
-    if (wordIndex >= 0) {
-      const timeout = setTimeout(() => {
-        updateProgress.mutate(
-          { id: bookId, data: { currentChapter: chapterNumber, characterPosition: wordIndex } },
-          {
-            onSuccess: () => {
-              queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bookId) });
-            },
-          }
-        );
-      }, 3000);
-      return () => clearTimeout(timeout);
+    setCurrentSentence(0);
+  }, [chapterNumber]);
+
+  // Save progress on chapter visit
+  useEffect(() => {
+    if (bookId && chapterNumber) {
+      updateProgress.mutate(
+        { id: bookId, data: { currentChapter: chapterNumber, characterPosition: 0 } },
+        { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bookId) }) }
+      );
     }
-    return undefined;
-  }, [wordIndex, bookId, chapterNumber]);
-
-  // Save progress on chapter change
-  useEffect(() => {
-    updateProgress.mutate({ id: bookId, data: { currentChapter: chapterNumber, characterPosition: 0 } });
   }, [chapterNumber, bookId]);
 
-  const totalChapters = book?.totalChapters ?? 0;
-  const hasPrev = chapterNumber > 1;
-  const hasNext = chapterNumber < totalChapters;
+  // Auto-hide controls
+  const showControlsTemp = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
+  }, []);
+
+  // Sentence ref for scroll
+  const sentenceRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  useEffect(() => {
+    const el = sentenceRefs.current[currentSentence];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [currentSentence]);
 
   const goTo = (num: number) => {
-    stop();
     setLocation(`/read/${bookId}/chapter/${num}`);
   };
 
-  // Auto-hide controls
-  let hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showControlsTemp = () => {
-    setShowControls(true);
-    if (hideTimeout.current) clearTimeout(hideTimeout.current);
-    if (isPlaying) {
-      hideTimeout.current = setTimeout(() => setShowControls(false), 4000);
-    }
-  };
-
-  useEffect(() => {
-    if (!isPlaying) {
-      setShowControls(true);
-      if (hideTimeout.current) clearTimeout(hideTimeout.current);
-    }
-  }, [isPlaying]);
+  const bgClass = THEME_BG[theme];
+  const themeClass = THEME_CLASSES[theme];
+  const fontClass = font === "serif" ? "font-serif" : "font-sans";
 
   return (
     <div
-      className="min-h-screen bg-background relative"
+      className={`min-h-screen ${bgClass} ${themeClass} relative transition-colors duration-300`}
       onMouseMove={showControlsTemp}
       onTouchStart={showControlsTemp}
     >
-      {/* Top Bar */}
+      {/* Top bar */}
       <AnimatePresence>
         {showControls && (
           <motion.header
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border"
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.18 }}
+            className="fixed top-0 left-0 right-0 z-30 border-b border-border/50"
+            style={{ background: "rgba(15,17,23,0.92)", backdropFilter: "blur(12px)" }}
           >
-            <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
-              <Button variant="ghost" size="icon" asChild>
-                <Link href={`/book/${bookId}`} data-testid="btn-back" onClick={() => stop()}>
+            <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
+                <Link href={`/book/${bookId}`} data-testid="btn-back">
                   <ArrowLeft className="w-4 h-4" />
                 </Link>
               </Button>
-              <div className="flex-1 text-center min-w-0">
-                <p className="font-serif text-sm font-medium truncate text-foreground">{book?.title}</p>
-                <p className="text-xs text-muted-foreground">
+
+              <div className="flex-1 min-w-0 text-center">
+                <p className="text-xs text-muted-foreground truncate">{book?.title}</p>
+                <p className="text-sm font-medium text-foreground truncate">
                   {chapter?.title ?? `Chapter ${chapterNumber}`}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              <div className="flex items-center gap-1 shrink-0">
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="ghost" size="icon" className="h-8 w-8"
                   onClick={() => setShowSummary((v) => !v)}
                   data-testid="btn-summary"
                 >
                   <Sparkles className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="icon" asChild data-testid="btn-ask">
-                  <Link href={`/book/${bookId}/ask`} onClick={() => stop()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                  <Link href={`/book/${bookId}/ask`} data-testid="btn-ask">
                     <MessageSquare className="w-4 h-4" />
                   </Link>
                 </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="btn-settings">
+                      <Settings2 className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto" align="end">
+                    <ReaderSettings
+                      fontSize={fontSize} onFontSize={setFontSize}
+                      lineHeight={lineHeight} onLineHeight={setLineHeight}
+                      theme={theme} onTheme={setTheme}
+                      font={font} onFont={setFont}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </motion.header>
         )}
       </AnimatePresence>
 
-      {/* Reader Content */}
-      <div className="pt-20 pb-48 px-6">
-        <div className="max-w-2xl mx-auto">
-          {/* Chapter heading */}
-          <div className="mb-8 text-center">
-            <Badge variant="outline" className="mb-3 text-xs">
-              Chapter {chapterNumber} of {totalChapters}
-            </Badge>
-            <h2 className="font-serif text-2xl font-bold text-foreground">
-              {chapter?.title ?? `Chapter ${chapterNumber}`}
-            </h2>
-            {chapter && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {chapter.wordCount.toLocaleString()} words
-              </p>
-            )}
-          </div>
-
-          {chapterLoading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className={`h-4 ${i % 4 === 3 ? "w-3/4" : "w-full"}`} />
-              ))}
-            </div>
-          ) : chapter ? (
-            <div style={{ fontSize: `${fontSize}px` }}>
-              <ChapterText content={chapter.content} wordIndex={wordIndex} />
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Bottom TTS Controls */}
+      {/* Chapter navigation (prev/next chapter arrows) */}
       <AnimatePresence>
         {showControls && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
-            className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-sm border-t border-border"
-          >
-            <div className="max-w-3xl mx-auto px-6 py-4 space-y-3">
-              {/* Main controls */}
-              <div className="flex items-center justify-between gap-4">
-                {/* Nav */}
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => goTo(chapterNumber - 1)}
-                    disabled={!hasPrev}
-                    data-testid="btn-prev-chapter"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => goTo(chapterNumber + 1)}
-                    disabled={!hasNext}
-                    data-testid="btn-next-chapter"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Play / Pause / Stop */}
-                <div className="flex items-center gap-2">
-                  {isPlaying ? (
-                    <Button onClick={pause} size="icon" data-testid="btn-pause">
-                      <Pause className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button onClick={resume} size="icon" data-testid="btn-play" disabled={chapterLoading}>
-                      <Play className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button variant="outline" size="icon" onClick={stop} data-testid="btn-stop">
-                    <Square className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Font size */}
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setFontSize((s) => Math.max(14, s - 1))}
-                    className="text-xs px-2 py-1 rounded hover:bg-accent transition-colors font-mono"
-                    data-testid="btn-font-decrease"
-                  >
-                    A−
-                  </button>
-                  <button
-                    onClick={() => setFontSize((s) => Math.min(24, s + 1))}
-                    className="text-xs px-2 py-1 rounded hover:bg-accent transition-colors font-mono"
-                    data-testid="btn-font-increase"
-                  >
-                    A+
-                  </button>
-                </div>
-              </div>
-
-              {/* Speed + Voice */}
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2 flex-1 min-w-[160px]">
-                  <Volume2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <Slider
-                    value={[speed]}
-                    min={0.5}
-                    max={2}
-                    step={0.1}
-                    onValueChange={([v]) => { setSpeed(v); if (isPlaying) { stop(); setTimeout(play, 50); } }}
-                    className="flex-1"
-                    data-testid="slider-speed"
-                  />
-                  <span className="text-xs text-muted-foreground w-8 shrink-0">{speed.toFixed(1)}×</span>
-                </div>
-                <VoiceSelector value={voiceURI} onChange={setVoiceURI} />
-              </div>
-            </div>
-          </motion.div>
+          <>
+            {chapterNumber > 1 && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => goTo(chapterNumber - 1)}
+                className="fixed left-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-card/80 border border-border backdrop-blur-sm hover:bg-card hover:border-primary/50 transition-all"
+                data-testid="btn-prev-chapter"
+              >
+                <ChevronLeft className="w-5 h-5 text-foreground" />
+              </motion.button>
+            )}
+            {chapterNumber < totalChapters && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => goTo(chapterNumber + 1)}
+                className="fixed right-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-card/80 border border-border backdrop-blur-sm hover:bg-card hover:border-primary/50 transition-all"
+                data-testid="btn-next-chapter"
+              >
+                <ChevronRight className="w-5 h-5 text-foreground" />
+              </motion.button>
+            )}
+          </>
         )}
       </AnimatePresence>
 
-      {/* Summary Sidebar */}
+      {/* Reading content */}
+      <div className="pt-20 pb-56 px-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Chapter header */}
+          <div className="text-center mb-10">
+            <Badge variant="outline" className="mb-3 text-xs font-mono border-border/60">
+              {chapterNumber} / {totalChapters}
+            </Badge>
+            <h1
+              className={`font-serif text-2xl font-semibold mb-1 ${
+                theme === "dark" ? "text-white/90" : theme === "sepia" ? "text-amber-950" : "text-gray-900"
+              }`}
+            >
+              {chapter?.title ?? `Chapter ${chapterNumber}`}
+            </h1>
+            {chapter && (
+              <p className="text-xs text-muted-foreground font-mono">{chapter.wordCount.toLocaleString()} words</p>
+            )}
+          </div>
+
+          {/* Text */}
+          {chapterLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <Skeleton key={i} className={`h-4 ${i % 5 === 4 ? "w-2/3" : "w-full"} bg-white/5`} />
+              ))}
+            </div>
+          ) : chapter ? (
+            <div
+              className={`prose-reader ${fontClass}`}
+              style={{
+                fontSize: `${fontSize}px`,
+                lineHeight,
+                color: theme === "dark" ? "hsl(215 15% 85%)" : theme === "sepia" ? "#3d2b1f" : "#111827",
+              }}
+            >
+              {sentences.map((sentence, idx) => (
+                <span
+                  key={idx}
+                  ref={(el) => { sentenceRefs.current[idx] = el; }}
+                  data-testid={`sentence-${idx}`}
+                  className={`transition-all duration-200 ${
+                    idx === currentSentence ? "sentence-active" : ""
+                  }`}
+                  onClick={() => setCurrentSentence(idx)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {sentence}{" "}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Chapter nav (bottom) */}
+          {!chapterLoading && chapter && (
+            <div className="flex items-center justify-between mt-12 pt-8 border-t border-border/30">
+              <Button
+                variant="outline"
+                onClick={() => goTo(chapterNumber - 1)}
+                disabled={chapterNumber <= 1}
+                className="gap-2"
+                data-testid="btn-prev-chapter-bottom"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => goTo(chapterNumber + 1)}
+                disabled={chapterNumber >= totalChapters}
+                className="gap-2"
+                data-testid="btn-next-chapter-bottom"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Audio Player Bar */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 px-4 py-3"
+        style={{ background: "rgba(15,17,23,0.95)", backdropFilter: "blur(16px)" }}
+      >
+        <div className="max-w-3xl mx-auto">
+          <AudioPlayer
+            sentences={sentences}
+            currentIdx={currentSentence}
+            onSentenceChange={setCurrentSentence}
+            voice={voice}
+            rate={rate}
+            onVoiceChange={setVoice}
+            onRateChange={setRate}
+            voices={voices}
+            voicesLoading={voicesLoading}
+            disabled={chapterLoading || !chapter}
+          />
+        </div>
+      </div>
+
+      {/* Summary panel */}
       <AnimatePresence>
         {showSummary && (
-          <SummaryPanel bookId={bookId} chapterNumber={chapterNumber} onClose={() => setShowSummary(false)} />
+          <SummaryPanel
+            bookId={bookId}
+            chapterNumber={chapterNumber}
+            onClose={() => setShowSummary(false)}
+          />
         )}
       </AnimatePresence>
     </div>

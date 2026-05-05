@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Upload, FileText, Plus, X } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Plus, X, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,32 +21,28 @@ export default function ImportPage() {
   const [content, setContent] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const createBook = useCreateBook();
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
       setContent(text);
-      if (!title) {
-        setTitle(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
-      }
+      if (!title) setTitle(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
     };
     reader.readAsText(file);
   };
 
   const addTag = () => {
     const t = tagInput.trim();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
-    }
+    if (t && !tags.includes(t)) setTags([...tags, t]);
     setTagInput("");
   };
-
-  const removeTag = (t: string) => setTags(tags.filter((x) => x !== t));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +55,7 @@ export default function ImportPage() {
       {
         onSuccess: (book) => {
           queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
-          toast({ title: "Novel imported!", description: `"${book.title}" has been added to your library.` });
+          toast({ title: "Imported!", description: `"${book.title}" added to your library.` });
           setLocation(`/book/${book.id}`);
         },
         onError: () => {
@@ -73,66 +69,70 @@ export default function ImportPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/" data-testid="btn-back">
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
+      <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+            <Link href="/" data-testid="btn-back"><ArrowLeft className="w-4 h-4" /></Link>
           </Button>
-          <h1 className="font-serif text-xl font-semibold">Import Novel</h1>
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-primary" />
+            <h1 className="font-semibold text-foreground">Import Novel</h1>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
+      <main className="max-w-2xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-sm font-medium">Title *</Label>
-            <Input
-              id="title"
-              data-testid="input-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Novel title"
-              required
-            />
-          </div>
-
-          {/* Author */}
-          <div className="space-y-2">
-            <Label htmlFor="author" className="text-sm font-medium">Author</Label>
-            <Input
-              id="author"
-              data-testid="input-author"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder="Author name (optional)"
-            />
+          {/* Title + Author */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Title *</Label>
+              <Input
+                id="title"
+                data-testid="input-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Novel title"
+                className="bg-secondary border-border"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="author" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Author</Label>
+              <Input
+                id="author"
+                data-testid="input-author"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder="Author name"
+                className="bg-secondary border-border"
+              />
+            </div>
           </div>
 
           {/* Tags */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Tags</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tags</Label>
             <div className="flex gap-2">
               <Input
                 data-testid="input-tag"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
-                placeholder="Add a tag (e.g. fantasy, romance)"
+                placeholder="fantasy, romance, sci-fi…"
+                className="bg-secondary border-border text-sm"
               />
-              <Button type="button" variant="outline" onClick={addTag} data-testid="btn-add-tag">
+              <Button type="button" variant="outline" size="icon" onClick={addTag} data-testid="btn-add-tag">
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-2">
                 {tags.map((t) => (
-                  <Badge key={t} variant="secondary" className="gap-1 pl-2 pr-1 py-1">
+                  <Badge key={t} variant="secondary" className="gap-1 text-xs">
                     {t}
-                    <button type="button" onClick={() => removeTag(t)} className="hover:text-destructive">
-                      <X className="w-3 h-3" />
+                    <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
+                      <X className="w-3 h-3 hover:text-destructive" />
                     </button>
                   </Badge>
                 ))}
@@ -140,38 +140,43 @@ export default function ImportPage() {
             )}
           </div>
 
-          {/* File Upload */}
+          {/* File upload */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Upload File</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload .txt File</Label>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               data-testid="btn-upload"
-              className="w-full border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 hover:bg-accent/30 transition-all group cursor-pointer"
+              className={`w-full border-2 border-dashed rounded-xl p-8 text-center transition-all group cursor-pointer
+                ${fileName ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/40 hover:bg-secondary/40"}`}
             >
-              <Upload className="w-8 h-8 mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-3" />
-              <p className="text-sm font-medium text-foreground">Click to upload a .txt file</p>
-              <p className="text-xs text-muted-foreground mt-1">Plain text files only</p>
+              {fileName ? (
+                <div className="flex items-center justify-center gap-3">
+                  <FileText className="w-6 h-6 text-primary" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-foreground">{fileName}</p>
+                    <p className="text-xs text-muted-foreground">{wordCount.toLocaleString()} words loaded</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-2" />
+                  <p className="text-sm font-medium text-foreground">Click to upload a .txt file</p>
+                  <p className="text-xs text-muted-foreground mt-1">Plain text only</p>
+                </>
+              )}
             </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".txt,text/plain"
-              className="hidden"
-              onChange={handleFile}
-              data-testid="input-file"
-            />
+            <input ref={fileRef} type="file" accept=".txt,text/plain" className="hidden" onChange={handleFile} data-testid="input-file" />
           </div>
 
-          {/* Content */}
-          <div className="space-y-2">
+          {/* Paste content */}
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="content" className="text-sm font-medium flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Paste Text *
+              <Label htmlFor="content" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Or Paste Text *
               </Label>
               {wordCount > 0 && (
-                <span className="text-xs text-muted-foreground" data-testid="text-wordcount">
+                <span className="text-xs text-muted-foreground font-mono" data-testid="text-wordcount">
                   {wordCount.toLocaleString()} words
                 </span>
               )}
@@ -181,24 +186,22 @@ export default function ImportPage() {
               data-testid="textarea-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Paste your novel text here. The app will automatically detect and parse chapters."
-              className="min-h-48 font-mono text-sm resize-y"
+              placeholder={`Paste your novel text here.\n\nChapters are auto-detected from headings like:\n  Chapter 1, CHAPTER 1, 1. Title…`}
+              className="min-h-52 font-mono text-xs bg-secondary border-border resize-y"
             />
-            <p className="text-xs text-muted-foreground">
-              Chapters are auto-detected from headers like "Chapter 1", "CHAPTER 1", etc.
-            </p>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" asChild>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="ghost" asChild>
               <Link href="/">Cancel</Link>
             </Button>
             <Button
               type="submit"
               disabled={createBook.isPending || !title.trim() || !content.trim()}
+              className="bg-primary hover:bg-primary/90"
               data-testid="btn-submit-import"
             >
-              {createBook.isPending ? "Importing..." : "Import Novel"}
+              {createBook.isPending ? "Importing…" : "Import Novel"}
             </Button>
           </div>
         </form>
