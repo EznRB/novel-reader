@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Upload, FileText, Plus, X, BookOpen } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Plus, X, BookOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,20 +22,48 @@ export default function ImportPage() {
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [parsingEpub, setParsingEpub] = useState(false);
 
   const createBook = useCreateBook();
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      setContent(text);
-      if (!title) setTitle(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
-    };
-    reader.readAsText(file);
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+
+    if (ext === "epub") {
+      setParsingEpub(true);
+      try {
+        const formData = new FormData();
+        formData.append("epub", file);
+        const resp = await fetch("/api/books/import-epub", { method: "POST", body: formData });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error ?? "Failed to parse EPUB");
+        }
+        const data = (await resp.json()) as { title: string; author: string; content: string };
+        setContent(data.content);
+        if (!title && data.title) setTitle(data.title);
+        if (!author && data.author) setAuthor(data.author);
+        toast({ title: "EPUB parsed!", description: `Extracted ${data.content.trim().split(/\s+/).length.toLocaleString()} words.` });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "EPUB parsing failed";
+        toast({ title: "EPUB error", description: msg, variant: "destructive" });
+        setFileName(null);
+      } finally {
+        setParsingEpub(false);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        setContent(text);
+        if (!title) setTitle(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
+      };
+      reader.readAsText(file);
+    }
   };
 
   const addTag = () => {
@@ -142,15 +170,25 @@ export default function ImportPage() {
 
           {/* File upload */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload .txt File</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload .epub or .txt File</Label>
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => !parsingEpub && fileRef.current?.click()}
               data-testid="btn-upload"
+              disabled={parsingEpub}
               className={`w-full border-2 border-dashed rounded-xl p-8 text-center transition-all group cursor-pointer
-                ${fileName ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/40 hover:bg-secondary/40"}`}
+                ${fileName && !parsingEpub ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/40 hover:bg-secondary/40"}
+                ${parsingEpub ? "opacity-70 cursor-wait" : ""}`}
             >
-              {fileName ? (
+              {parsingEpub ? (
+                <div className="flex items-center justify-center gap-3">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-foreground">Parsing EPUB…</p>
+                    <p className="text-xs text-muted-foreground">Extracting chapters and text</p>
+                  </div>
+                </div>
+              ) : fileName ? (
                 <div className="flex items-center justify-center gap-3">
                   <FileText className="w-6 h-6 text-primary" />
                   <div className="text-left">
@@ -161,12 +199,19 @@ export default function ImportPage() {
               ) : (
                 <>
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-2" />
-                  <p className="text-sm font-medium text-foreground">Click to upload a .txt file</p>
-                  <p className="text-xs text-muted-foreground mt-1">Plain text only</p>
+                  <p className="text-sm font-medium text-foreground">Click to upload a file</p>
+                  <p className="text-xs text-muted-foreground mt-1">Supports .epub and .txt</p>
                 </>
               )}
             </button>
-            <input ref={fileRef} type="file" accept=".txt,text/plain" className="hidden" onChange={handleFile} data-testid="input-file" />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".epub,.txt,text/plain,application/epub+zip"
+              className="hidden"
+              onChange={handleFile}
+              data-testid="input-file"
+            />
           </div>
 
           {/* Paste content */}
@@ -197,7 +242,7 @@ export default function ImportPage() {
             </Button>
             <Button
               type="submit"
-              disabled={createBook.isPending || !title.trim() || !content.trim()}
+              disabled={createBook.isPending || parsingEpub || !title.trim() || !content.trim()}
               className="bg-primary hover:bg-primary/90"
               data-testid="btn-submit-import"
             >

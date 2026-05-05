@@ -7,6 +7,7 @@ import charactersRouter from "./characters";
 import aiRouter from "./ai";
 import ttsRouter from "./tts";
 import exportRouter from "./export";
+import epubImportRouter from "./epub-import";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(charactersRouter);
 router.use(aiRouter);
 router.use(ttsRouter);
 router.use(exportRouter);
+router.use(epubImportRouter);
 
 export default router;
