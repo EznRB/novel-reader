@@ -1,0 +1,238 @@
+Você é um **arquiteto de software sênior, tech lead e product designer**. Quero que você crie um **plano completo, técnico e realista** para desenvolver um app pessoal de leitura de novels com IA por voz.
+
+## Objetivo do projeto
+
+Quero construir um app para ler novels de forma imersiva e interativa, usando voz para narração e comandos, com IA para ajudar a acompanhar a história. O projeto é **pessoal**, então a prioridade é:
+
+1. rapidez de desenvolvimento,
+2. simplicidade de manutenção,
+3. boa experiência de uso,
+4. custo baixo,
+5. arquitetura que não vire um caos depois.
+
+## O que o app precisa fazer
+
+Considere, no mínimo, estas ideias:
+
+* importar novels em TXT, EPUB, PDF e texto colado manualmente
+* organizar biblioteca pessoal
+* continuar leitura de onde parei
+* leitura por voz com boa naturalidade
+* pause, play, avanço, voltar, velocidade de leitura
+* comandos por voz
+* resumo automático de capítulos
+* memória de personagens, locais, eventos e relações
+* perguntas e respostas sobre o conteúdo já lido
+* destaques sincronizados com a narração, se viável
+* múltiplas vozes, se fizer sentido
+* favoritos, tags, histórico e progresso
+* interface bonita, simples e imersiva
+* funcionar bem com novels longas
+* ser construído com ajuda de IA/vibe coding
+
+## O que eu quero que você entregue
+
+Quero uma resposta organizada, direta e extremamente prática, com as seguintes partes:
+
+### 1. Viabilidade realista
+
+Explique honestamente:
+
+* o que é fácil
+* o que é médio
+* o que é difícil
+* o que pode ser feito no MVP
+* o que deve ficar para depois
+* quais partes provavelmente vão dar problema
+
+### 2. Melhor arquitetura do sistema
+
+Defina a arquitetura ideal do app, cobrindo:
+
+* front-end
+* back-end
+* banco de dados
+* armazenamento de arquivos
+* IA
+* TTS
+* STT
+* cache
+* processamento assíncrono
+* autenticação, se necessário
+* organização por módulos
+
+### 3. Stack recomendada
+
+Escolha a melhor stack possível e explique por quê.
+Se houver mais de uma opção boa, compare:
+
+* stack mais simples
+* stack mais robusta
+* stack mais barata
+
+Quero saber quais tecnologias usar e por que elas fazem sentido para esse projeto.
+
+### 4. Plano por fases
+
+Divida em fases bem claras:
+
+* MVP mínimo viável
+* versão intermediária
+* versão avançada
+
+Para cada fase, diga:
+
+* o que entra
+* o que fica de fora
+* a dificuldade
+* o que vale priorizar
+* o que pode quebrar
+
+### 5. Roadmap de implementação
+
+Monte uma ordem ideal de desenvolvimento, por exemplo:
+
+* setup do projeto
+* estrutura básica
+* importação de texto
+* leitura por voz
+* progresso
+* resumo
+* memória
+* comandos de voz
+* refinamento da UI
+* otimização
+
+### 6. Telas e componentes
+
+Liste as telas e componentes principais do app, como:
+
+* tela inicial
+* biblioteca
+* leitor
+* player de voz
+* painel de resumo
+* memória de personagens
+* configurações
+* busca
+* histórico
+
+### 7. Fluxo do usuário
+
+Descreva o caminho completo do usuário:
+
+* abrir app
+* importar novel
+* escolher capítulo
+* iniciar leitura
+* pausar
+* pedir resumo
+* perguntar algo sobre a história
+* continuar depois
+
+### 8. Modelo de dados
+
+Crie uma sugestão de estrutura de banco de dados ou modelo de dados, incluindo entidades como:
+
+* usuários
+* livros
+* capítulos
+* progresso
+* resumos
+* personagens
+* eventos
+* preferências
+* histórico de áudio
+
+### 9. Estratégia de IA
+
+Explique como usar IA para:
+
+* resumir capítulos
+* manter contexto
+* responder perguntas
+* extrair personagens e eventos
+* evitar alucinações
+* trabalhar com textos longos
+
+### 10. Estratégia de voz
+
+Explique como implementar:
+
+* leitura por voz
+* reconhecimento de voz
+* comandos por voz
+* vozes diferentes, se possível
+* sincronização com texto
+* limitações técnicas
+
+### 11. Performance e escalabilidade pessoal
+
+Explique como lidar com:
+
+* novels muito longas
+* capítulos grandes
+* custo de IA
+* cache
+* geração de resumo
+* processamento em segundo plano
+* evitar travamentos
+
+### 12. Riscos e soluções
+
+Liste riscos técnicos e como evitar cada um, como:
+
+* custo alto
+* contexto longo demais
+* voz ruim
+* atraso no áudio
+* IA inventando informação
+* UI confusa
+* excesso de complexidade
+
+### 13. O que não fazer agora
+
+Quero que você diga claramente o que **não vale a pena construir logo de cara**.
+
+### 14. Sugestão de MVP enxuto
+
+Me dê uma versão mínima, mas boa, do app, com foco em construir algo que já seja útil e prazeroso de usar.
+
+### 15. Plano de execução para vibe coding
+
+Quero uma abordagem pensada para desenvolvimento com:
+
+* Cursor
+* Antigravity
+* ChatGPT
+* geração assistida de código
+
+Então me entregue também:
+
+* prompts menores para cada etapa
+* como dividir o projeto em tarefas pequenas
+* como evitar que a IA gere um caos arquitetural
+* como revisar o código gerado
+
+## Regras da resposta
+
+* Seja totalmente honesto.
+* Não simplifique demais.
+* Não invente features desnecessárias.
+* Pense como alguém que realmente vai construir isso sozinho.
+* Priorize estabilidade, clareza e baixo atrito.
+* Explique de forma prática, com linguagem direta.
+* Se algo for arriscado, diga.
+* Se algo for caro, diga.
+* Se algo for complexidade desnecessária, diga também.
+* Dê uma resposta útil para execução real, não só teoria.
+
+## Formato ideal da resposta
+
+Use títulos claros, subtítulos e uma ordem lógica.
+Se possível, termine com:
+
+* uma recomendação final de stack
+* uma recomendação final de MVP
+* uma ordem de construção em passos numerados
+* um checklist final do projeto

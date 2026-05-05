@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Novel Reader"
+version = "1.0.0"
+id = "artifacts/novel-reader"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18942
+
+[services.development]
+run = "pnpm --filter @workspace/novel-reader run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/novel-reader", "run", "build" ]
+publicDir = "artifacts/novel-reader/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18942"
+BASE_PATH = "/"

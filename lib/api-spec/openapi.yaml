@@ -3,13 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for Novel Reader
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: books
+    description: Book library management
+  - name: chapters
+    description: Chapter content and navigation
+  - name: progress
+    description: Reading progress tracking
+  - name: summaries
+    description: AI-generated chapter summaries
+  - name: characters
+    description: Character memory and tracking
+  - name: ai
+    description: AI Q&A and analysis
+
 paths:
   /healthz:
     get:
@@ -24,6 +37,333 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /books:
+    get:
+      operationId: listBooks
+      tags: [books]
+      summary: List all books
+      responses:
+        "200":
+          description: List of books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Book"
+
+    post:
+      operationId: createBook
+      tags: [books]
+      summary: Create a new book
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookBody"
+      responses:
+        "201":
+          description: Book created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "400":
+          description: Invalid input
+
+  /books/{id}:
+    get:
+      operationId: getBook
+      tags: [books]
+      summary: Get a book by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Book details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          description: Book not found
+
+    patch:
+      operationId: updateBook
+      tags: [books]
+      summary: Update book metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookBody"
+      responses:
+        "200":
+          description: Updated book
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          description: Book not found
+
+    delete:
+      operationId: deleteBook
+      tags: [books]
+      summary: Delete a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Book not found
+
+  /books/{id}/stats:
+    get:
+      operationId: getBookStats
+      tags: [books]
+      summary: Get book statistics
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Book statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookStats"
+        "404":
+          description: Book not found
+
+  /books/{id}/chapters:
+    get:
+      operationId: listChapters
+      tags: [chapters]
+      summary: List chapters for a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of chapters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chapter"
+        "404":
+          description: Book not found
+
+  /books/{id}/chapters/{chapterNumber}:
+    get:
+      operationId: getChapter
+      tags: [chapters]
+      summary: Get a specific chapter by number
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: chapterNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chapter content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chapter"
+        "404":
+          description: Chapter not found
+
+  /books/{id}/progress:
+    get:
+      operationId: getReadingProgress
+      tags: [progress]
+      summary: Get reading progress for a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reading progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadingProgress"
+        "404":
+          description: Not found
+
+    put:
+      operationId: updateReadingProgress
+      tags: [progress]
+      summary: Update reading progress
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReadingProgressBody"
+      responses:
+        "200":
+          description: Updated progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadingProgress"
+
+  /books/{id}/chapters/{chapterNumber}/summary:
+    get:
+      operationId: getChapterSummary
+      tags: [summaries]
+      summary: Get or generate an AI summary for a chapter
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: chapterNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chapter summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterSummary"
+        "404":
+          description: Chapter not found
+
+  /books/{id}/characters:
+    get:
+      operationId: listCharacters
+      tags: [characters]
+      summary: List characters for a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of characters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Character"
+        "404":
+          description: Book not found
+
+    post:
+      operationId: extractCharacters
+      tags: [characters]
+      summary: AI-extract characters from chapters read so far
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Extracted characters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Character"
+        "404":
+          description: Book not found
+
+  /books/{id}/ask:
+    post:
+      operationId: askAboutBook
+      tags: [ai]
+      summary: Ask an AI question about the book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskBookBody"
+      responses:
+        "200":
+          description: AI answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAnswer"
+        "404":
+          description: Book not found
+
+  /library/recent:
+    get:
+      operationId: getRecentActivity
+      tags: [books]
+      summary: Get recently read books with progress
+      responses:
+        "200":
+          description: Recent reading activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecentBook"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +374,254 @@ components:
       required:
         - status
 
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        author:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        totalChapters:
+          type: integer
+        totalWords:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        isFavorite:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - totalChapters
+        - totalWords
+        - tags
+        - isFavorite
+        - createdAt
+        - updatedAt
+
+    CreateBookBody:
+      type: object
+      properties:
+        title:
+          type: string
+        author:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      required:
+        - title
+        - content
+
+    UpdateBookBody:
+      type: object
+      properties:
+        title:
+          type: ["string", "null"]
+        author:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        tags:
+          type: ["array", "null"]
+          items:
+            type: string
+        isFavorite:
+          type: ["boolean", "null"]
+
+    BookStats:
+      type: object
+      properties:
+        bookId:
+          type: integer
+        totalChapters:
+          type: integer
+        totalWords:
+          type: integer
+        chaptersRead:
+          type: integer
+        percentComplete:
+          type: number
+        characterCount:
+          type: integer
+        summaryCount:
+          type: integer
+      required:
+        - bookId
+        - totalChapters
+        - totalWords
+        - chaptersRead
+        - percentComplete
+        - characterCount
+        - summaryCount
+
+    Chapter:
+      type: object
+      properties:
+        id:
+          type: integer
+        bookId:
+          type: integer
+        chapterNumber:
+          type: integer
+        title:
+          type: ["string", "null"]
+        content:
+          type: string
+        wordCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookId
+        - chapterNumber
+        - content
+        - wordCount
+        - createdAt
+
+    ReadingProgress:
+      type: object
+      properties:
+        id:
+          type: integer
+        bookId:
+          type: integer
+        currentChapter:
+          type: integer
+        characterPosition:
+          type: integer
+        lastReadAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookId
+        - currentChapter
+        - characterPosition
+        - lastReadAt
+
+    UpdateReadingProgressBody:
+      type: object
+      properties:
+        currentChapter:
+          type: integer
+        characterPosition:
+          type: integer
+      required:
+        - currentChapter
+        - characterPosition
+
+    ChapterSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        chapterId:
+          type: integer
+        chapterNumber:
+          type: integer
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - chapterId
+        - chapterNumber
+        - summary
+        - createdAt
+
+    Character:
+      type: object
+      properties:
+        id:
+          type: integer
+        bookId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        role:
+          type: ["string", "null"]
+        firstAppearanceChapter:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookId
+        - name
+        - createdAt
+
+    AskBookBody:
+      type: object
+      properties:
+        question:
+          type: string
+        upToChapter:
+          type: ["integer", "null"]
+      required:
+        - question
+
+    AiAnswer:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+        upToChapter:
+          type: ["integer", "null"]
+      required:
+        - question
+        - answer
+
+    RecentBook:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        author:
+          type: ["string", "null"]
+        currentChapter:
+          type: integer
+        totalChapters:
+          type: integer
+        percentComplete:
+          type: number
+        lastReadAt:
+          type: ["string", "null"]
+          format: date-time
+        isFavorite:
+          type: boolean
+      required:
+        - id
+        - title
+        - currentChapter
+        - totalChapters
+        - percentComplete
+        - isFavorite
