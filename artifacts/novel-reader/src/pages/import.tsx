@@ -22,11 +22,14 @@ export default function ImportPage() {
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [epubFile, setEpubFile] = useState<File | null>(null);
   const [parsingEpub, setParsingEpub] = useState(false);
+  // Store epub-derived title/author for display only (before user edits)
+  const [epubMeta, setEpubMeta] = useState<{ title: string; author: string } | null>(null);
 
   const createBook = useCreateBook();
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
@@ -34,28 +37,35 @@ export default function ImportPage() {
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (ext === "epub") {
+      // Store file and pre-fetch metadata only (no text round-trip)
+      setEpubFile(file);
+      setContent(""); // EPUB content lives on server side
+
+      // Quick peek at metadata by sending with a "metadata-only" flag
+      // We'll do a lightweight prefetch to fill title/author fields
+      const formData = new FormData();
+      formData.append("epub", file);
+      formData.append("metaOnly", "true");
+
       setParsingEpub(true);
-      try {
-        const formData = new FormData();
-        formData.append("epub", file);
-        const resp = await fetch("/api/books/import-epub", { method: "POST", body: formData });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error((err as { error?: string }).error ?? "Failed to parse EPUB");
-        }
-        const data = (await resp.json()) as { title: string; author: string; content: string };
-        setContent(data.content);
-        if (!title && data.title) setTitle(data.title);
-        if (!author && data.author) setAuthor(data.author);
-        toast({ title: "EPUB parsed!", description: `Extracted ${data.content.trim().split(/\s+/).length.toLocaleString()} words.` });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "EPUB parsing failed";
-        toast({ title: "EPUB error", description: msg, variant: "destructive" });
-        setFileName(null);
-      } finally {
-        setParsingEpub(false);
-      }
+      fetch("/api/books/epub-meta", { method: "POST", body: formData })
+        .then(async (resp) => {
+          if (resp.ok) {
+            const data = await resp.json() as { title: string; author: string };
+            setEpubMeta(data);
+            if (!title) setTitle(data.title);
+            if (!author) setAuthor(data.author);
+          }
+        })
+        .catch(() => {
+          // Non-critical — user can type title/author manually
+          const guessedTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+          setTitle(guessedTitle);
+        })
+        .finally(() => setParsingEpub(false));
     } else {
+      setEpubFile(null);
+      setEpubMeta(null);
       const reader = new FileReader();
       reader.onload = (ev) => {
         const text = ev.target?.result as string;
@@ -72,28 +82,73 @@ export default function ImportPage() {
     setTagInput("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) {
-      toast({ title: "Missing fields", description: "Title and content are required.", variant: "destructive" });
+
+    if (!title.trim()) {
+      toast({ title: "Missing title", description: "Please enter a title.", variant: "destructive" });
       return;
     }
-    createBook.mutate(
-      { data: { title: title.trim(), author: author.trim() || undefined, content: content.trim(), tags } },
-      {
-        onSuccess: (book) => {
-          queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
-          toast({ title: "Imported!", description: `"${book.title}" added to your library.` });
-          setLocation(`/book/${book.id}`);
-        },
-        onError: () => {
-          toast({ title: "Import failed", description: "Something went wrong. Please try again.", variant: "destructive" });
-        },
+
+    if (epubFile) {
+      // EPUB path: send multipart directly — backend creates book
+      if (!epubMeta && !title.trim()) {
+        toast({ title: "Still loading", description: "Metadata is still loading. Try again in a moment.", variant: "destructive" });
+        return;
       }
-    );
+
+      setParsingEpub(true);
+      try {
+        const formData = new FormData();
+        formData.append("epub", epubFile);
+        formData.append("title", title.trim());
+        if (author.trim()) formData.append("author", author.trim());
+        if (tags.length > 0) formData.append("tags", tags.join(","));
+
+        const resp = await fetch("/api/books/import-epub", { method: "POST", body: formData });
+        const data = await resp.json() as { bookId?: number; error?: string; chapterCount?: number; wordCount?: number };
+
+        if (!resp.ok) {
+          throw new Error(data.error ?? "Import failed");
+        }
+
+        await queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
+        toast({
+          title: "Imported!",
+          description: `"${title}" — ${data.chapterCount} chapters, ${(data.wordCount ?? 0).toLocaleString()} words.`,
+        });
+        setLocation(`/book/${data.bookId}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Something went wrong.";
+        toast({ title: "Import failed", description: msg, variant: "destructive" });
+      } finally {
+        setParsingEpub(false);
+      }
+    } else {
+      // TXT / paste path
+      if (!content.trim()) {
+        toast({ title: "Missing content", description: "Please upload a .txt file or paste text.", variant: "destructive" });
+        return;
+      }
+      createBook.mutate(
+        { data: { title: title.trim(), author: author.trim() || undefined, content: content.trim(), tags } },
+        {
+          onSuccess: (book) => {
+            queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
+            toast({ title: "Imported!", description: `"${book.title}" added to your library.` });
+            setLocation(`/book/${book.id}`);
+          },
+          onError: () => {
+            toast({ title: "Import failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+          },
+        }
+      );
+    }
   };
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const isLoading = parsingEpub || createBook.isPending;
+  const canSubmit = title.trim() && (epubFile !== null || content.trim()) && !isLoading;
 
   return (
     <div className="min-h-screen bg-background">
@@ -173,27 +228,30 @@ export default function ImportPage() {
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload .epub or .txt File</Label>
             <button
               type="button"
-              onClick={() => !parsingEpub && fileRef.current?.click()}
+              onClick={() => !isLoading && fileRef.current?.click()}
               data-testid="btn-upload"
-              disabled={parsingEpub}
+              disabled={isLoading}
               className={`w-full border-2 border-dashed rounded-xl p-8 text-center transition-all group cursor-pointer
                 ${fileName && !parsingEpub ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/40 hover:bg-secondary/40"}
-                ${parsingEpub ? "opacity-70 cursor-wait" : ""}`}
+                ${isLoading ? "opacity-70 cursor-wait" : ""}`}
             >
-              {parsingEpub ? (
+              {parsingEpub && !epubFile ? (
                 <div className="flex items-center justify-center gap-3">
                   <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-foreground">Parsing EPUB…</p>
-                    <p className="text-xs text-muted-foreground">Extracting chapters and text</p>
-                  </div>
+                  <p className="text-sm font-medium text-foreground">Reading metadata…</p>
                 </div>
               ) : fileName ? (
                 <div className="flex items-center justify-center gap-3">
                   <FileText className="w-6 h-6 text-primary" />
                   <div className="text-left">
                     <p className="text-sm font-medium text-foreground">{fileName}</p>
-                    <p className="text-xs text-muted-foreground">{wordCount.toLocaleString()} words loaded</p>
+                    {epubFile ? (
+                      <p className="text-xs text-muted-foreground">
+                        {epubMeta ? `Ready to import — ${title || epubMeta.title}` : "Ready to import"}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{wordCount.toLocaleString()} words loaded</p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -214,27 +272,29 @@ export default function ImportPage() {
             />
           </div>
 
-          {/* Paste content */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="content" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Or Paste Text *
-              </Label>
-              {wordCount > 0 && (
-                <span className="text-xs text-muted-foreground font-mono" data-testid="text-wordcount">
-                  {wordCount.toLocaleString()} words
-                </span>
-              )}
+          {/* Paste content — only shown for non-epub */}
+          {!epubFile && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="content" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Or Paste Text *
+                </Label>
+                {wordCount > 0 && (
+                  <span className="text-xs text-muted-foreground font-mono" data-testid="text-wordcount">
+                    {wordCount.toLocaleString()} words
+                  </span>
+                )}
+              </div>
+              <Textarea
+                id="content"
+                data-testid="textarea-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={`Paste your novel text here.\n\nChapters are auto-detected from headings like:\n  Chapter 1, CHAPTER 1, 1. Title…`}
+                className="min-h-52 font-mono text-xs bg-secondary border-border resize-y"
+              />
             </div>
-            <Textarea
-              id="content"
-              data-testid="textarea-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder={`Paste your novel text here.\n\nChapters are auto-detected from headings like:\n  Chapter 1, CHAPTER 1, 1. Title…`}
-              className="min-h-52 font-mono text-xs bg-secondary border-border resize-y"
-            />
-          </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="ghost" asChild>
@@ -242,11 +302,17 @@ export default function ImportPage() {
             </Button>
             <Button
               type="submit"
-              disabled={createBook.isPending || parsingEpub || !title.trim() || !content.trim()}
-              className="bg-primary hover:bg-primary/90"
+              disabled={!canSubmit}
+              className="bg-primary hover:bg-primary/90 min-w-32"
               data-testid="btn-submit-import"
             >
-              {createBook.isPending ? "Importing…" : "Import Novel"}
+              {parsingEpub ? (
+                <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Importing…</span>
+              ) : createBook.isPending ? (
+                "Importing…"
+              ) : (
+                "Import Novel"
+              )}
             </Button>
           </div>
         </form>
