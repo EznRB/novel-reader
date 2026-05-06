@@ -395,6 +395,8 @@ components:
             type: string
         isFavorite:
           type: boolean
+        coverImage:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time

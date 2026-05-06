@@ -11,6 +11,7 @@ export const booksTable = pgTable("books", {
   totalWords: integer("total_words").notNull().default(0),
   tags: text("tags").array().notNull().default([]),
   isFavorite: boolean("is_favorite").notNull().default(false),
+  coverImage: text("cover_image"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

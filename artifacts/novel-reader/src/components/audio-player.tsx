@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Loader2 } from "lucide-react";
+import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Loader2, Sparkles } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,56 @@ export interface Voice {
 
 export type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
+type VoiceStyle = "narration" | "cheerful" | "sad" | "excited" | "angry" | "whisper" | "dialogue";
+
+const STYLE_LABELS: Record<VoiceStyle, string> = {
+  narration: "Narrating",
+  dialogue:  "Dialogue",
+  cheerful:  "Cheerful",
+  sad:       "Somber",
+  excited:   "Excited",
+  angry:     "Intense",
+  whisper:   "Hushed",
+};
+
+const STYLE_COLORS: Record<VoiceStyle, string> = {
+  narration: "text-muted-foreground",
+  dialogue:  "text-blue-400",
+  cheerful:  "text-yellow-400",
+  sad:       "text-indigo-400",
+  excited:   "text-orange-400",
+  angry:     "text-red-400",
+  whisper:   "text-violet-400",
+};
+
+function detectStyle(text: string): VoiceStyle {
+  const s = text.trim();
+
+  // Dialogue: quoted speech or short question
+  if (/[""\u201C\u201D\u2018\u2019'']/.test(s)) return "dialogue";
+  if (s.endsWith("?") && s.length < 90) return "dialogue";
+
+  // Exclamation
+  if (s.endsWith("!")) {
+    const angryCues = /\b(never|die|kill|destroy|fool|idiot|coward|traitor|damn|enough|how dare|impossible|you dare)\b/i;
+    return angryCues.test(s) ? "angry" : "excited";
+  }
+
+  // Sad / grief
+  const sadCues = /\b(died?|death|dead|lost|grief|tear|wept?|cried?|sorrow|pain|heartbreak|alone|lonely|miss|gone forever|helpless|hopeless|despair|mourn|suffer|agony|anguish)\b/i;
+  if (sadCues.test(s)) return "sad";
+
+  // Fear / tension
+  const fearCues = /\b(terrif|horror|fear|afraid|trembl|shiver|monster|demon|threaten|danger|flee|escape|alarm|shadow|darkness|chill|ghostly)\b/i;
+  if (fearCues.test(s)) return "angry";
+
+  // Action / battle
+  const actionCues = /\b(attack|fight|battle|clash|rush|charge|explo|shatter|slash|pierce|struck|blood|wound|combat|crush|defeat|sword|punch|blade|burst|collide)\b/i;
+  if (actionCues.test(s)) return "excited";
+
+  return "narration";
+}
+
 interface AudioPlayerProps {
   sentences: string[];
   currentIdx: number;
@@ -27,6 +77,8 @@ interface AudioPlayerProps {
   voices: Voice[];
   voicesLoading: boolean;
   disabled?: boolean;
+  immersive?: boolean;
+  onPlayingChange?: (playing: boolean) => void;
 }
 
 function WaveformViz() {
@@ -39,17 +91,12 @@ function WaveformViz() {
   );
 }
 
-function buildTTSUrl(text: string, voice: string, rate: number): string {
-  const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  return `${base}/api/tts/synthesize`;
-}
-
-async function fetchAudioBlob(text: string, voice: string, rate: number): Promise<string> {
-  const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+async function fetchAudioBlob(text: string, voice: string, rate: number, style: string): Promise<string> {
+  const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
   const res = await fetch(`${base}/api/tts/synthesize`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: text.trim(), voice, rate }),
+    body: JSON.stringify({ text: text.trim(), voice, rate, style }),
   });
   if (!res.ok) throw new Error(`TTS error ${res.status}`);
   const blob = await res.blob();
@@ -67,18 +114,27 @@ export function AudioPlayer({
   voices,
   voicesLoading,
   disabled,
+  immersive = false,
+  onPlayingChange,
 }: AudioPlayerProps) {
   const [status, setStatus] = useState<PlayerStatus>("idle");
+  const [currentStyle, setCurrentStyle] = useState<VoiceStyle>("narration");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentUrlRef = useRef<string | null>(null);
   const prefetchUrlRef = useRef<string | null>(null);
   const prefetchIdxRef = useRef<number>(-1);
+  const prefetchStyleRef = useRef<string>("narration");
   const playingIdxRef = useRef<number>(-1);
   const shouldPlayRef = useRef(false);
 
   const revokeUrl = (url: string | null) => {
     if (url) URL.revokeObjectURL(url);
   };
+
+  // Notify parent when playing state changes
+  useEffect(() => {
+    onPlayingChange?.(status === "playing");
+  }, [status, onPlayingChange]);
 
   const stopAudio = useCallback(() => {
     shouldPlayRef.current = false;
@@ -91,22 +147,26 @@ export function AudioPlayer({
     currentUrlRef.current = null;
     prefetchUrlRef.current = null;
     prefetchIdxRef.current = -1;
+    prefetchStyleRef.current = "narration";
     playingIdxRef.current = -1;
     setStatus("idle");
+    setCurrentStyle("narration");
   }, []);
 
-  // Prefetch next sentence
   const prefetchNext = useCallback(async (idx: number) => {
     if (idx >= sentences.length || idx === prefetchIdxRef.current) return;
+    const style = immersive ? detectStyle(sentences[idx]) : "narration";
+    if (idx === prefetchIdxRef.current && style === prefetchStyleRef.current) return;
     prefetchIdxRef.current = idx;
+    prefetchStyleRef.current = style;
     try {
-      const url = await fetchAudioBlob(sentences[idx], voice, rate);
+      const url = await fetchAudioBlob(sentences[idx], voice, rate, style);
       revokeUrl(prefetchUrlRef.current);
       prefetchUrlRef.current = url;
     } catch {
       prefetchUrlRef.current = null;
     }
-  }, [sentences, voice, rate]);
+  }, [sentences, voice, rate, immersive]);
 
   const playSentence = useCallback(async (idx: number) => {
     if (idx >= sentences.length || !sentences[idx]?.trim()) {
@@ -114,18 +174,24 @@ export function AudioPlayer({
       return;
     }
 
+    const style = immersive ? detectStyle(sentences[idx]) : "narration";
     setStatus("loading");
+    setCurrentStyle(style as VoiceStyle);
     playingIdxRef.current = idx;
     onSentenceChange(idx);
 
     try {
       let url: string;
-      if (prefetchIdxRef.current === idx && prefetchUrlRef.current) {
+      if (
+        prefetchIdxRef.current === idx &&
+        prefetchStyleRef.current === style &&
+        prefetchUrlRef.current
+      ) {
         url = prefetchUrlRef.current;
         prefetchUrlRef.current = null;
         prefetchIdxRef.current = -1;
       } else {
-        url = await fetchAudioBlob(sentences[idx], voice, rate);
+        url = await fetchAudioBlob(sentences[idx], voice, rate, style);
       }
 
       if (!shouldPlayRef.current) { revokeUrl(url); return; }
@@ -139,13 +205,12 @@ export function AudioPlayer({
       await audio.play();
       setStatus("playing");
 
-      // Prefetch next
       prefetchNext(idx + 1);
     } catch (err) {
       console.error("TTS play error:", err);
       if (shouldPlayRef.current) setStatus("error");
     }
-  }, [sentences, voice, rate, onSentenceChange, stopAudio, prefetchNext]);
+  }, [sentences, voice, rate, onSentenceChange, stopAudio, prefetchNext, immersive]);
 
   const handleEnded = useCallback(() => {
     if (!shouldPlayRef.current) return;
@@ -157,7 +222,6 @@ export function AudioPlayer({
     }
   }, [sentences.length, playSentence, stopAudio]);
 
-  // Wire audio element
   useEffect(() => {
     const audio = new Audio();
     audio.addEventListener("ended", handleEnded);
@@ -198,26 +262,19 @@ export function AudioPlayer({
 
   const skipBack = () => {
     const newIdx = Math.max(0, currentIdx - 1);
-    if (shouldPlayRef.current) {
-      playSentence(newIdx);
-    } else {
-      onSentenceChange(newIdx);
-    }
+    if (shouldPlayRef.current) playSentence(newIdx);
+    else onSentenceChange(newIdx);
   };
 
   const skipForward = () => {
     const newIdx = Math.min(sentences.length - 1, currentIdx + 1);
-    if (shouldPlayRef.current) {
-      playSentence(newIdx);
-    } else {
-      onSentenceChange(newIdx);
-    }
+    if (shouldPlayRef.current) playSentence(newIdx);
+    else onSentenceChange(newIdx);
   };
 
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
 
-  // English voices first, then all others
   const englishVoices = voices.filter((v) => v.Locale.startsWith("en-"));
   const otherVoices = voices.filter((v) => !v.Locale.startsWith("en-"));
 
@@ -234,6 +291,13 @@ export function AudioPlayer({
             style={{ width: `${((currentIdx + 1) / Math.max(1, sentences.length)) * 100}%` }}
           />
         </div>
+        {/* Immersive style badge */}
+        {immersive && isPlaying && (
+          <div className={`flex items-center gap-1 text-[10px] font-medium shrink-0 ${STYLE_COLORS[currentStyle]}`}>
+            <Sparkles className="w-3 h-3" />
+            <span>{STYLE_LABELS[currentStyle]}</span>
+          </div>
+        )}
       </div>
 
       {/* Controls row */}
@@ -301,7 +365,6 @@ export function AudioPlayer({
 
         {/* Speed + Voice */}
         <div className="flex items-center gap-4 flex-wrap">
-          {/* Rate slider */}
           <div className="flex items-center gap-2 min-w-[160px]">
             <Volume2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <Slider
@@ -309,7 +372,7 @@ export function AudioPlayer({
               min={-50}
               max={50}
               step={5}
-              onValueChange={([v]) => { onRateChange(v); if (isPlaying) { stop(); } }}
+              onValueChange={([v]) => { onRateChange(v); if (isPlaying) stop(); }}
               className="w-28"
               data-testid="slider-rate"
             />
@@ -318,7 +381,6 @@ export function AudioPlayer({
             </span>
           </div>
 
-          {/* Voice selector */}
           {!voicesLoading && voices.length > 0 && (
             <Select
               value={voice}

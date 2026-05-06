@@ -20,6 +20,8 @@ export interface Book {
   totalWords: number;
   tags: string[];
   isFavorite: boolean;
+  /** @nullable */
+  coverImage?: string | null;
   createdAt: string;
   updatedAt: string;
 }

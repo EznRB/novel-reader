@@ -7,6 +7,7 @@ import BookDetailPage from "@/pages/book-detail";
 import ReaderPage from "@/pages/reader";
 import ImportPage from "@/pages/import";
 import AskPage from "@/pages/ask";
+import ProfilePage from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -20,6 +21,7 @@ function Router() {
     <Switch>
       <Route path="/" component={LibraryPage} />
       <Route path="/import" component={ImportPage} />
+      <Route path="/profile" component={ProfilePage} />
       <Route path="/book/:id" component={BookDetailPage} />
       <Route path="/book/:id/ask" component={AskPage} />
       <Route path="/read/:id/chapter/:num" component={ReaderPage} />

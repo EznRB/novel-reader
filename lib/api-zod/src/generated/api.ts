@@ -27,6 +27,7 @@ export const ListBooksResponseItem = zod.object({
   totalWords: zod.number(),
   tags: zod.array(zod.string()),
   isFavorite: zod.boolean(),
+  coverImage: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -59,6 +60,7 @@ export const GetBookResponse = zod.object({
   totalWords: zod.number(),
   tags: zod.array(zod.string()),
   isFavorite: zod.boolean(),
+  coverImage: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -87,6 +89,7 @@ export const UpdateBookResponse = zod.object({
   totalWords: zod.number(),
   tags: zod.array(zod.string()),
   isFavorite: zod.boolean(),
+  coverImage: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });

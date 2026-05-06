@@ -4,7 +4,18 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// GET /api/tts/voices
+// Style → prosody adjustments (rate delta %, pitch Hz, optional volume %)
+const STYLE_PROSODY: Record<string, { rateDelta: number; pitch: string; volume?: string }> = {
+  narration:  { rateDelta: 0,   pitch: "+0Hz" },
+  dialogue:   { rateDelta: 5,   pitch: "+2Hz" },
+  cheerful:   { rateDelta: 10,  pitch: "+6Hz",  volume: "+10%" },
+  sad:        { rateDelta: -20, pitch: "-6Hz",  volume: "-5%"  },
+  excited:    { rateDelta: 18,  pitch: "+10Hz", volume: "+15%" },
+  angry:      { rateDelta: 8,   pitch: "-8Hz",  volume: "+10%" },
+  whisper:    { rateDelta: -25, pitch: "-3Hz",  volume: "-10%" },
+};
+
+// GET /tts/voices
 router.get("/tts/voices", async (_req, res): Promise<void> => {
   try {
     const tts = new MsEdgeTTS();
@@ -16,12 +27,18 @@ router.get("/tts/voices", async (_req, res): Promise<void> => {
   }
 });
 
-// POST /api/tts/synthesize
+// POST /tts/synthesize
 router.post("/tts/synthesize", async (req, res): Promise<void> => {
-  const { text, voice = "en-US-AriaNeural", rate = 0 } = req.body as {
+  const {
+    text,
+    voice = "en-US-AriaNeural",
+    rate = 0,
+    style = "narration",
+  } = req.body as {
     text?: string;
     voice?: string;
     rate?: number;
+    style?: string;
   };
 
   if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -34,6 +51,10 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
     return;
   }
 
+  const prosody = STYLE_PROSODY[style] ?? STYLE_PROSODY.narration;
+  const totalRate = Math.max(-80, Math.min(100, (Number(rate) || 0) + prosody.rateDelta));
+  const rateStr = `${totalRate >= 0 ? "+" : ""}${totalRate}%`;
+
   try {
     const tts = new MsEdgeTTS();
     await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
@@ -42,9 +63,10 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const { audioStream } = tts.toStream(text, {
-      rate: `${rate > 0 ? "+" : ""}${rate}%`,
-    });
+    const options: Record<string, string> = { rate: rateStr, pitch: prosody.pitch };
+    if (prosody.volume) options.volume = prosody.volume;
+
+    const { audioStream } = tts.toStream(text, options);
 
     audioStream.on("error", (err) => {
       logger.error({ err }, "TTS audio stream error");

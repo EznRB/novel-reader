@@ -3,12 +3,22 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   BookOpen, Plus, Heart, Clock, Search, ChevronRight,
-  Star, BarChart2, Flame,
+  BarChart2, Flame, User, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   useListBooks,
   useGetRecentActivity,
@@ -50,14 +60,26 @@ function CoverPlaceholder({ title, id }: { title: string; id: number }) {
   );
 }
 
+type BookItem = {
+  id: number;
+  title: string;
+  author?: string | null;
+  totalChapters: number;
+  isFavorite: boolean;
+  tags: string[];
+  coverImage?: string | null;
+};
+
 function BookCard({
   book,
   progress,
   onFavorite,
+  onDelete,
 }: {
-  book: { id: number; title: string; author?: string | null; totalChapters: number; isFavorite: boolean; tags: string[] };
+  book: BookItem;
   progress?: { currentChapter: number; percentComplete: number } | null;
   onFavorite: (id: number, val: boolean) => void;
+  onDelete: (id: number) => void;
 }) {
   return (
     <motion.div variants={fadeUp} layout>
@@ -65,24 +87,17 @@ function BookCard({
         <div className="group relative bg-card border border-border rounded-lg overflow-hidden hover:border-primary/60 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/30">
           {/* Cover */}
           <div className="aspect-[2/3] relative overflow-hidden">
-            <CoverPlaceholder title={book.title} id={book.id} />
-            {/* Status badge */}
+            {book.coverImage ? (
+              <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
+            ) : (
+              <CoverPlaceholder title={book.title} id={book.id} />
+            )}
+            {/* Progress bar */}
             {progress && progress.percentComplete > 0 && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
-                <div
-                  className="progress-bar-fill"
-                  style={{ width: `${progress.percentComplete}%` }}
-                />
+                <div className="progress-bar-fill" style={{ width: `${progress.percentComplete}%` }} />
               </div>
             )}
-            {/* Favorite button */}
-            <button
-              data-testid={`btn-favorite-${book.id}`}
-              onClick={(e) => { e.preventDefault(); onFavorite(book.id, !book.isFavorite); }}
-              className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-            >
-              <Heart className={`w-3.5 h-3.5 ${book.isFavorite ? "fill-primary text-primary" : "text-white"}`} />
-            </button>
             {/* Reading badge */}
             {progress && progress.currentChapter > 1 && (
               <div className="absolute top-2 left-2">
@@ -91,6 +106,23 @@ function BookCard({
                 </span>
               </div>
             )}
+            {/* Action buttons — visible on hover */}
+            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+              <button
+                data-testid={`btn-favorite-${book.id}`}
+                onClick={(e) => { e.preventDefault(); onFavorite(book.id, !book.isFavorite); }}
+                className="p-1.5 bg-black/50 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+              >
+                <Heart className={`w-3.5 h-3.5 ${book.isFavorite ? "fill-primary text-primary" : "text-white"}`} />
+              </button>
+              <button
+                data-testid={`btn-delete-${book.id}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(book.id); }}
+                className="p-1.5 bg-black/50 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600/80"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-white" />
+              </button>
+            </div>
           </div>
           {/* Info */}
           <div className="p-3">
@@ -145,6 +177,7 @@ function RecentRow({ book }: {
 export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("All");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
   const { data: books, isLoading } = useListBooks();
   const { data: recent } = useGetRecentActivity();
   const updateBook = useUpdateBook();
@@ -160,6 +193,25 @@ export default function LibraryPage() {
         },
       }
     );
+  };
+
+  const handleDeleteRequest = (id: number) => {
+    const book = books?.find((b) => b.id === id);
+    if (book) setDeleteTarget({ id, title: book.title });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
+    try {
+      await fetch(`${base}/api/books/${deleteTarget.id}`, { method: "DELETE" });
+      queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() });
+    } catch {
+      /* silent */
+    } finally {
+      setDeleteTarget(null);
+    }
   };
 
   const progressMap = new Map(
@@ -208,6 +260,11 @@ export default function LibraryPage() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
+            <Button variant="ghost" size="icon" className="h-9 w-9" asChild title="Profile">
+              <Link href="/profile" data-testid="btn-profile">
+                <User className="w-4 h-4" />
+              </Link>
+            </Button>
             <Button asChild size="sm" data-testid="btn-import" className="bg-primary hover:bg-primary/90">
               <Link href="/import">
                 <Plus className="w-3.5 h-3.5 mr-1.5" />
@@ -239,7 +296,7 @@ export default function LibraryPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        {/* Continue reading (only on "All" tab, no search) */}
+        {/* Continue reading */}
         {tab === "All" && !search && recentActive.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-3">
@@ -307,12 +364,34 @@ export default function LibraryPage() {
                   book={book}
                   progress={progressMap.get(book.id)}
                   onFavorite={handleFavorite}
+                  onDelete={handleDeleteRequest}
                 />
               ))}
             </motion.div>
           )}
         </section>
       </main>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.title}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this book and all its chapters, progress, summaries, and character data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,15 +1,26 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, BookOpen, Heart, MessageSquare, Users,
   ChevronRight, Sparkles, BarChart2, Loader2,
-  Download, FileText, BookMarked,
+  Download, FileText, BookMarked, Camera, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   useGetBook,
   useGetBookStats,
@@ -74,6 +85,8 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [extracting, setExtracting] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: book, isLoading: bookLoading } = useGetBook(bookId, {
     query: { enabled: !!bookId, queryKey: getGetBookQueryKey(bookId) },
@@ -123,8 +136,46 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
   };
 
   const handleExport = (format: "pdf" | "epub") => {
-    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
     window.open(`${base}/api/books/${bookId}/export/${format}`, "_blank");
+  };
+
+  const handleDelete = async () => {
+    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
+    try {
+      const res = await fetch(`${base}/api/books/${bookId}`, { method: "DELETE" });
+      if (res.ok || res.status === 204) {
+        setLocation("/");
+      } else {
+        toast({ title: "Delete failed", description: "Could not delete this book.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Delete failed", description: "Network error.", variant: "destructive" });
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCoverUploading(true);
+    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
+    const formData = new FormData();
+    formData.append("cover", file);
+    try {
+      const res = await fetch(`${base}/api/books/${bookId}/cover`, { method: "POST", body: formData });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: getGetBookQueryKey(bookId) });
+        toast({ title: "Cover updated!" });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Upload failed", description: (err as { error?: string }).error ?? "Unknown error", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Upload failed", description: "Network error.", variant: "destructive" });
+    } finally {
+      setCoverUploading(false);
+    }
   };
 
   if (bookLoading) {
@@ -172,6 +223,35 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                 <MessageSquare className="w-4 h-4" />
               </Link>
             </Button>
+            {/* Delete book */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  data-testid="btn-delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete "{book.title}"?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the book along with all its chapters, reading progress, AI summaries, and character data. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  >
+                    Delete book
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </header>
@@ -179,9 +259,37 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
         {/* Hero */}
         <div className="flex gap-5 items-start">
-          {/* Cover */}
-          <div className="w-32 h-48 sm:w-40 sm:h-60 rounded-lg overflow-hidden border border-border shrink-0 shadow-xl">
-            <CoverArt title={book.title} id={bookId} large />
+          {/* Cover — click to upload */}
+          <div className="shrink-0">
+            <div
+              className="w-32 h-48 sm:w-40 sm:h-60 rounded-lg overflow-hidden border border-border shadow-xl relative group cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              title="Click to change cover"
+            >
+              {book.coverImage ? (
+                <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
+              ) : (
+                <CoverArt title={book.title} id={bookId} large />
+              )}
+              {/* Upload overlay */}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                {coverUploading ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <>
+                    <Camera className="w-6 h-6 text-white" />
+                    <span className="text-white text-xs font-medium">Change Cover</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleCoverUpload}
+            />
           </div>
 
           {/* Meta */}
@@ -330,10 +438,9 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                     <Link href={`/read/${bookId}/chapter/${ch.chapterNumber}`}>
                       <div
                         data-testid={`item-chapter-${ch.chapterNumber}`}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all group
-                          hover:bg-secondary/60
-                          ${isCurrent ? "bg-primary/10 border border-primary/30" : ""}
-                        `}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all group hover:bg-secondary/60 ${
+                          isCurrent ? "bg-primary/10 border border-primary/30" : ""
+                        }`}
                       >
                         <span className={`text-xs font-mono w-6 shrink-0 ${isCurrent ? "text-primary font-bold" : "text-muted-foreground"}`}>
                           {String(ch.chapterNumber).padStart(2, "0")}

@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, MessageSquare,
-  Sparkles, X, Loader2, Settings2, Sun, BookOpen,
+  Sparkles, X, Loader2, Settings2, Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -148,9 +148,9 @@ function ReaderSettings({
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Background</p>
         <div className="flex gap-2">
           {([
-            { key: "dark", label: "Dark", bg: "bg-[#0f1117]", text: "text-white" },
-            { key: "sepia", label: "Sepia", bg: "bg-[#f5ead0]", text: "text-amber-900" },
-            { key: "light", label: "Light", bg: "bg-white", text: "text-gray-900" },
+            { key: "dark",  label: "Dark",  bg: "bg-[#0f1117]", text: "text-white"      },
+            { key: "sepia", label: "Sepia", bg: "bg-[#f5ead0]", text: "text-amber-900"  },
+            { key: "light", label: "Light", bg: "bg-white",     text: "text-gray-900"   },
           ] as const).map(({ key, label, bg, text }) => (
             <button
               key={key}
@@ -173,7 +173,7 @@ function useVoices() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
     fetch(`${base}/api/tts/voices`)
       .then((r) => r.json())
       .then((data: Voice[]) => setVoices(data))
@@ -197,6 +197,8 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const [font, setFont] = useState<ReaderFont>("serif");
   const [showSummary, setShowSummary] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [cinematicMode, setCinematicMode] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // TTS state
@@ -248,13 +250,64 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentSentence]);
 
-  const goTo = (num: number) => {
-    setLocation(`/read/${bookId}/chapter/${num}`);
-  };
+  // ── Keyboard shortcuts ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        const btn = document.querySelector<HTMLElement>(
+          '[data-testid="btn-pause"], [data-testid="btn-play"]'
+        );
+        btn?.click();
+        return;
+      }
+
+      if (e.key === "ArrowRight" && e.shiftKey) {
+        e.preventDefault();
+        if (chapterNumber < totalChapters) setLocation(`/read/${bookId}/chapter/${chapterNumber + 1}`);
+        return;
+      }
+      if (e.key === "ArrowLeft" && e.shiftKey) {
+        e.preventDefault();
+        if (chapterNumber > 1) setLocation(`/read/${bookId}/chapter/${chapterNumber - 1}`);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const btn = document.querySelector<HTMLElement>('[data-testid="btn-skip-forward"]');
+        btn?.click();
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const btn = document.querySelector<HTMLElement>('[data-testid="btn-skip-back"]');
+        btn?.click();
+        return;
+      }
+      if (e.key === "Escape") {
+        setShowSummary(false);
+        return;
+      }
+      if (e.key === "c" || e.key === "C") {
+        setCinematicMode((v) => !v);
+        return;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [chapterNumber, totalChapters, bookId, setLocation]);
+
+  const goTo = (num: number) => setLocation(`/read/${bookId}/chapter/${num}`);
 
   const bgClass = THEME_BG[theme];
   const themeClass = THEME_CLASSES[theme];
   const fontClass = font === "serif" ? "font-serif" : "font-sans";
+
+  // Cinematic dim: only dim when cinematic + audio playing
+  const dimInactive = cinematicMode && isAudioPlaying;
 
   return (
     <div
@@ -262,6 +315,16 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       onMouseMove={showControlsTemp}
       onTouchStart={showControlsTemp}
     >
+      {/* Cinematic vignette overlay */}
+      {dimInactive && (
+        <div
+          className="pointer-events-none fixed inset-0 z-10"
+          style={{
+            background: "radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)",
+          }}
+        />
+      )}
+
       {/* Top bar */}
       <AnimatePresence>
         {showControls && (
@@ -288,6 +351,15 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                {/* Cinematic mode toggle */}
+                <Button
+                  variant="ghost" size="icon" className={`h-8 w-8 ${cinematicMode ? "text-primary bg-primary/10" : ""}`}
+                  onClick={() => setCinematicMode((v) => !v)}
+                  title="Cinematic mode (C)"
+                  data-testid="btn-cinematic"
+                >
+                  <Film className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="ghost" size="icon" className="h-8 w-8"
                   onClick={() => setShowSummary((v) => !v)}
@@ -317,19 +389,26 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 </Popover>
               </div>
             </div>
+
+            {/* Keyboard hint */}
+            {cinematicMode && (
+              <div className="text-center pb-1">
+                <span className="text-[10px] text-muted-foreground/60 font-mono">
+                  Space: play/pause · ← →: sentence · Shift+← →: chapter · C: cinematic · Esc: close
+                </span>
+              </div>
+            )}
           </motion.header>
         )}
       </AnimatePresence>
 
-      {/* Chapter navigation (prev/next chapter arrows) */}
+      {/* Chapter navigation arrows */}
       <AnimatePresence>
         {showControls && (
           <>
             {chapterNumber > 1 && (
               <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => goTo(chapterNumber - 1)}
                 className="fixed left-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-card/80 border border-border backdrop-blur-sm hover:bg-card hover:border-primary/50 transition-all"
                 data-testid="btn-prev-chapter"
@@ -339,9 +418,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
             )}
             {chapterNumber < totalChapters && (
               <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => goTo(chapterNumber + 1)}
                 className="fixed right-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-card/80 border border-border backdrop-blur-sm hover:bg-card hover:border-primary/50 transition-all"
                 data-testid="btn-next-chapter"
@@ -389,20 +466,32 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 color: theme === "dark" ? "hsl(215 15% 85%)" : theme === "sepia" ? "#3d2b1f" : "#111827",
               }}
             >
-              {sentences.map((sentence, idx) => (
-                <span
-                  key={idx}
-                  ref={(el) => { sentenceRefs.current[idx] = el; }}
-                  data-testid={`sentence-${idx}`}
-                  className={`transition-all duration-200 ${
-                    idx === currentSentence ? "sentence-active" : ""
-                  }`}
-                  onClick={() => setCurrentSentence(idx)}
-                  style={{ cursor: "pointer" }}
-                >
-                  {sentence}{" "}
-                </span>
-              ))}
+              {sentences.map((sentence, idx) => {
+                const isActive = idx === currentSentence;
+                return (
+                  <span
+                    key={idx}
+                    ref={(el) => { sentenceRefs.current[idx] = el; }}
+                    data-testid={`sentence-${idx}`}
+                    className={`transition-all duration-300 ${
+                      isActive
+                        ? "sentence-active"
+                        : dimInactive
+                          ? "opacity-25"
+                          : ""
+                    }`}
+                    style={{
+                      cursor: "pointer",
+                      ...(isActive && cinematicMode ? {
+                        textShadow: "0 0 20px rgba(var(--primary), 0.4)",
+                      } : {}),
+                    }}
+                    onClick={() => setCurrentSentence(idx)}
+                  >
+                    {sentence}{" "}
+                  </span>
+                );
+              })}
             </div>
           ) : null}
 
@@ -416,8 +505,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 className="gap-2"
                 data-testid="btn-prev-chapter-bottom"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Previous
+                <ChevronLeft className="w-4 h-4" /> Previous
               </Button>
               <Button
                 variant="outline"
@@ -426,8 +514,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 className="gap-2"
                 data-testid="btn-next-chapter-bottom"
               >
-                Next
-                <ChevronRight className="w-4 h-4" />
+                Next <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           )}
@@ -451,6 +538,8 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
             voices={voices}
             voicesLoading={voicesLoading}
             disabled={chapterLoading || !chapter}
+            immersive={cinematicMode}
+            onPlayingChange={setIsAudioPlaying}
           />
         </div>
       </div>
