@@ -1,0 +1,1 @@
+- [AudioPlayer ref pattern](audio-player-ref-pattern.md) — Audio element must be created once (empty deps); use prop refs to avoid stuck-loading bug from cascading useCallback deps.

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -218,7 +218,14 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   });
   const updateProgress = useUpdateReadingProgress();
 
-  const sentences = chapter?.content ? splitSentences(chapter.content) : [];
+  // useMemo keeps the array reference stable across re-renders so the AudioPlayer
+  // does not see a new prop on every render (which was the root cause of the
+  // "stuck on loading" bug — new reference → useCallback deps change → Audio
+  // element recreated → shouldPlayRef reset to false mid-fetch).
+  const sentences = useMemo(
+    () => (chapter?.content ? splitSentences(chapter.content) : []),
+    [chapter?.content],
+  );
   const totalChapters = book?.totalChapters ?? 0;
 
   // Reset sentence index on chapter change
