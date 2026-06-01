@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, MessageSquare,
-  Sparkles, X, Loader2, Settings2, Film,
+  Sparkles, X, Loader2, Settings2, Film, List,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,23 +13,22 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   useGetChapter,
   useGetBook,
   useGetReadingProgress,
   useUpdateReadingProgress,
   useGetChapterSummary,
+  useListChapters,
   getGetChapterQueryKey,
   getGetBookQueryKey,
   getGetReadingProgressQueryKey,
   getGetChapterSummaryQueryKey,
+  getListChaptersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AudioPlayer, type Voice } from "@/components/audio-player";
 
-/* ── Sentence splitter ── */
+/* ── Helpers ── */
 function splitSentences(text: string): string[] {
   if (!text) return [];
   const raw = text
@@ -38,6 +37,26 @@ function splitSentences(text: string): string[] {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   return raw.length ? raw : [text.trim()];
+}
+
+function readingTime(wordCount: number): string {
+  const mins = Math.max(1, Math.round(wordCount / 200));
+  return `~${mins} min`;
+}
+
+/* ── LocalStorage hook ── */
+function useLocalStorage<T>(key: string, init: T): [T, (v: T) => void] {
+  const [value, setRaw] = useState<T>(() => {
+    try {
+      const s = localStorage.getItem(key);
+      return s !== null ? (JSON.parse(s) as T) : init;
+    } catch { return init; }
+  });
+  const set = useCallback((newVal: T) => {
+    setRaw(newVal);
+    try { localStorage.setItem(key, JSON.stringify(newVal)); } catch {}
+  }, [key]);
+  return [value, set];
 }
 
 /* ── Reader Theme types ── */
@@ -96,6 +115,72 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
         ) : (
           <p className="text-sm text-muted-foreground">Could not generate summary.</p>
         )}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── TOC panel ── */
+function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
+  chapters: Array<{ id: number; chapterNumber: number; title?: string | null; wordCount: number }>;
+  currentChapter: number;
+  onClose: () => void;
+  onNavigate: (num: number) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-ch="${currentChapter}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [currentChapter]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -320 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -320 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className="fixed top-0 left-0 h-full w-72 bg-card border-r border-border shadow-2xl z-40 flex flex-col"
+    >
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+        <div className="flex items-center gap-2">
+          <List className="w-4 h-4 text-primary" />
+          <span className="font-semibold text-sm">Chapters</span>
+          <Badge variant="secondary" className="text-xs ml-1">{chapters.length}</Badge>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {chapters.map((ch) => {
+          const isActive = ch.chapterNumber === currentChapter;
+          const isRead = ch.chapterNumber < currentChapter;
+          return (
+            <button
+              key={ch.id}
+              data-ch={ch.chapterNumber}
+              onClick={() => { onNavigate(ch.chapterNumber); onClose(); }}
+              className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-secondary/60 transition-colors border-b border-border/20 last:border-0 ${
+                isActive ? "bg-primary/10 border-l-2 border-l-primary" : ""
+              }`}
+            >
+              <span className={`text-xs font-mono mt-0.5 w-6 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted-foreground"}`}>
+                {String(ch.chapterNumber).padStart(2, "0")}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm truncate ${isActive ? "text-primary font-medium" : isRead ? "text-muted-foreground" : "text-foreground"}`}>
+                  {ch.title ?? `Chapter ${ch.chapterNumber}`}
+                </p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">
+                  {readingTime(ch.wordCount)}
+                  {isRead && !isActive && <span className="text-green-500 ml-2">✓</span>}
+                  {isActive && <span className="text-primary ml-2">● now</span>}
+                </p>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </motion.div>
   );
@@ -190,12 +275,17 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  // Reader settings
-  const [fontSize, setFontSize] = useState(18);
-  const [lineHeight, setLineHeight] = useState(1.9);
-  const [theme, setTheme] = useState<ReaderTheme>("dark");
-  const [font, setFont] = useState<ReaderFont>("serif");
+  // Persisted reader settings (survive page reload)
+  const [fontSize, setFontSize] = useLocalStorage("reader-font-size", 18);
+  const [lineHeight, setLineHeight] = useLocalStorage("reader-line-height", 1.9);
+  const [theme, setTheme] = useLocalStorage<ReaderTheme>("reader-theme", "dark");
+  const [font, setFont] = useLocalStorage<ReaderFont>("reader-font", "serif");
+  const [voice, setVoice] = useLocalStorage("reader-voice", "en-US-AriaNeural");
+  const [rate, setRate] = useLocalStorage("reader-rate", 0);
+
+  // Ephemeral UI state
   const [showSummary, setShowSummary] = useState(false);
+  const [showToc, setShowToc] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [cinematicMode, setCinematicMode] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -203,8 +293,6 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
 
   // TTS state
   const [currentSentence, setCurrentSentence] = useState(0);
-  const [voice, setVoice] = useState("en-US-AriaNeural");
-  const [rate, setRate] = useState(0);
   const { voices, loading: voicesLoading } = useVoices();
 
   const { data: book } = useGetBook(bookId, {
@@ -216,12 +304,13 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const { data: progress } = useGetReadingProgress(bookId, {
     query: { enabled: !!bookId, queryKey: getGetReadingProgressQueryKey(bookId) },
   });
+  // Only fetch chapter list when TOC is opened (lazy)
+  const { data: allChapters } = useListChapters(bookId, {
+    query: { enabled: !!bookId && showToc, queryKey: getListChaptersQueryKey(bookId) },
+  });
   const updateProgress = useUpdateReadingProgress();
 
-  // useMemo keeps the array reference stable across re-renders so the AudioPlayer
-  // does not see a new prop on every render (which was the root cause of the
-  // "stuck on loading" bug — new reference → useCallback deps change → Audio
-  // element recreated → shouldPlayRef reset to false mid-fetch).
+  // useMemo keeps array reference stable so AudioPlayer doesn't reset on every render
   const sentences = useMemo(
     () => (chapter?.content ? splitSentences(chapter.content) : []),
     [chapter?.content],
@@ -241,6 +330,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bookId) }) }
       );
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterNumber, bookId]);
 
   // Auto-hide controls
@@ -250,7 +340,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
     controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
   }, []);
 
-  // Sentence ref for scroll
+  // Sentence ref for scroll-into-view
   const sentenceRefs = useRef<(HTMLSpanElement | null)[]>([]);
   useEffect(() => {
     const el = sentenceRefs.current[currentSentence];
@@ -271,7 +361,6 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         btn?.click();
         return;
       }
-
       if (e.key === "ArrowRight" && e.shiftKey) {
         e.preventDefault();
         if (chapterNumber < totalChapters) setLocation(`/read/${bookId}/chapter/${chapterNumber + 1}`);
@@ -284,22 +373,25 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       }
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        const btn = document.querySelector<HTMLElement>('[data-testid="btn-skip-forward"]');
-        btn?.click();
+        document.querySelector<HTMLElement>('[data-testid="btn-skip-forward"]')?.click();
         return;
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        const btn = document.querySelector<HTMLElement>('[data-testid="btn-skip-back"]');
-        btn?.click();
+        document.querySelector<HTMLElement>('[data-testid="btn-skip-back"]')?.click();
         return;
       }
       if (e.key === "Escape") {
         setShowSummary(false);
+        setShowToc(false);
         return;
       }
       if (e.key === "c" || e.key === "C") {
         setCinematicMode((v) => !v);
+        return;
+      }
+      if (e.key === "t" || e.key === "T") {
+        setShowToc((v) => !v);
         return;
       }
     };
@@ -312,9 +404,10 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const bgClass = THEME_BG[theme];
   const themeClass = THEME_CLASSES[theme];
   const fontClass = font === "serif" ? "font-serif" : "font-sans";
-
-  // Cinematic dim: only dim when cinematic + audio playing
   const dimInactive = cinematicMode && isAudioPlaying;
+
+  // Suppress unused variable warning — progress is fetched to warm the cache
+  void progress;
 
   return (
     <div
@@ -326,9 +419,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       {dimInactive && (
         <div
           className="pointer-events-none fixed inset-0 z-10"
-          style={{
-            background: "radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)",
-          }}
+          style={{ background: "radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)" }}
         />
       )}
 
@@ -358,9 +449,18 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
-                {/* Cinematic mode toggle */}
                 <Button
-                  variant="ghost" size="icon" className={`h-8 w-8 ${cinematicMode ? "text-primary bg-primary/10" : ""}`}
+                  variant="ghost" size="icon"
+                  className={`h-8 w-8 ${showToc ? "text-primary bg-primary/10" : ""}`}
+                  onClick={() => setShowToc((v) => !v)}
+                  title="Table of Contents (T)"
+                  data-testid="btn-toc"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost" size="icon"
+                  className={`h-8 w-8 ${cinematicMode ? "text-primary bg-primary/10" : ""}`}
                   onClick={() => setCinematicMode((v) => !v)}
                   title="Cinematic mode (C)"
                   data-testid="btn-cinematic"
@@ -397,14 +497,12 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               </div>
             </div>
 
-            {/* Keyboard hint */}
-            {cinematicMode && (
-              <div className="text-center pb-1">
-                <span className="text-[10px] text-muted-foreground/60 font-mono">
-                  Space: play/pause · ← →: sentence · Shift+← →: chapter · C: cinematic · Esc: close
-                </span>
-              </div>
-            )}
+            {/* Keyboard shortcut hint */}
+            <div className="text-center pb-1">
+              <span className="text-[10px] text-muted-foreground/50 font-mono">
+                Space: play/pause · ← →: sentence · Shift+← →: chapter · T: chapters · C: cinematic · Esc: close
+              </span>
+            </div>
           </motion.header>
         )}
       </AnimatePresence>
@@ -438,7 +536,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       </AnimatePresence>
 
       {/* Reading content */}
-      <div className="pt-20 pb-56 px-4">
+      <div className="pt-24 pb-56 px-4">
         <div className="max-w-2xl mx-auto">
           {/* Chapter header */}
           <div className="text-center mb-10">
@@ -453,7 +551,9 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               {chapter?.title ?? `Chapter ${chapterNumber}`}
             </h1>
             {chapter && (
-              <p className="text-xs text-muted-foreground font-mono">{chapter.wordCount.toLocaleString()} words</p>
+              <p className="text-xs text-muted-foreground font-mono">
+                {chapter.wordCount.toLocaleString()} words · {readingTime(chapter.wordCount)}
+              </p>
             )}
           </div>
 
@@ -481,17 +581,11 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                     ref={(el) => { sentenceRefs.current[idx] = el; }}
                     data-testid={`sentence-${idx}`}
                     className={`transition-all duration-300 ${
-                      isActive
-                        ? "sentence-active"
-                        : dimInactive
-                          ? "opacity-25"
-                          : ""
+                      isActive ? "sentence-active" : dimInactive ? "opacity-25" : ""
                     }`}
                     style={{
                       cursor: "pointer",
-                      ...(isActive && cinematicMode ? {
-                        textShadow: "0 0 20px rgba(var(--primary), 0.4)",
-                      } : {}),
+                      ...(isActive && cinematicMode ? { textShadow: "0 0 20px rgba(var(--primary), 0.4)" } : {}),
                     }}
                     onClick={() => setCurrentSentence(idx)}
                   >
@@ -550,6 +644,18 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
           />
         </div>
       </div>
+
+      {/* TOC panel */}
+      <AnimatePresence>
+        {showToc && allChapters && (
+          <TocPanel
+            chapters={allChapters}
+            currentChapter={chapterNumber}
+            onClose={() => setShowToc(false)}
+            onNavigate={goTo}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Summary panel */}
       <AnimatePresence>

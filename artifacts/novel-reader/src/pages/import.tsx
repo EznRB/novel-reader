@@ -18,6 +18,7 @@ export default function ImportPage() {
 
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
+  const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -28,6 +29,7 @@ export default function ImportPage() {
   const [epubMeta, setEpubMeta] = useState<{ title: string; author: string } | null>(null);
 
   const createBook = useCreateBook();
+  const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,7 +50,7 @@ export default function ImportPage() {
       formData.append("metaOnly", "true");
 
       setParsingEpub(true);
-      fetch("/api/books/epub-meta", { method: "POST", body: formData })
+      fetch(`${base}/api/books/epub-meta`, { method: "POST", body: formData })
         .then(async (resp) => {
           if (resp.ok) {
             const data = await resp.json() as { title: string; author: string };
@@ -103,9 +105,10 @@ export default function ImportPage() {
         formData.append("epub", epubFile);
         formData.append("title", title.trim());
         if (author.trim()) formData.append("author", author.trim());
+        if (description.trim()) formData.append("description", description.trim());
         if (tags.length > 0) formData.append("tags", tags.join(","));
 
-        const resp = await fetch("/api/books/import-epub", { method: "POST", body: formData });
+        const resp = await fetch(`${base}/api/books/import-epub`, { method: "POST", body: formData });
         const data = await resp.json() as { bookId?: number; error?: string; chapterCount?: number; wordCount?: number };
 
         if (!resp.ok) {
@@ -131,7 +134,7 @@ export default function ImportPage() {
         return;
       }
       createBook.mutate(
-        { data: { title: title.trim(), author: author.trim() || undefined, content: content.trim(), tags } },
+        { data: { title: title.trim(), author: author.trim() || undefined, description: description.trim() || undefined, content: content.trim(), tags } },
         {
           onSuccess: (book) => {
             queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
@@ -191,6 +194,20 @@ export default function ImportPage() {
                 className="bg-secondary border-border"
               />
             </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</Label>
+            <Textarea
+              id="description"
+              data-testid="input-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Brief synopsis or notes (optional)"
+              className="min-h-16 bg-secondary border-border text-sm resize-none"
+              rows={2}
+            />
           </div>
 
           {/* Tags */}

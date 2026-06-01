@@ -104,7 +104,7 @@ router.get("/books/:id/chapters/:chapterNumber/summary", async (req, res): Promi
   const contentSnippet = chapter.content.slice(0, 12000);
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-4o-mini",
       max_completion_tokens: 500,
       messages: [
         {

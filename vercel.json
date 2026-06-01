@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm install --frozen-lockfile && pnpm run typecheck:libs && pnpm --filter @workspace/novel-reader run build",
+  "outputDirectory": "artifacts/novel-reader/dist/public",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://YOUR_API_DOMAIN/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "PORT": "3000",
+    "BASE_PATH": "/"
+  }
+}

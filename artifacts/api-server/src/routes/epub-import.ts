@@ -211,6 +211,7 @@ router.post("/books/import-epub", upload.single("epub"), async (req, res): Promi
     const titleOverride = (req.body as Record<string, string>)?.title?.trim();
     const authorOverride = (req.body as Record<string, string>)?.author?.trim();
     const tagsRaw = (req.body as Record<string, string>)?.tags?.trim();
+    const descriptionOverride = (req.body as Record<string, string>)?.description?.trim() || null;
 
     const finalTitle = titleOverride || epubTitle;
     const finalAuthor = authorOverride || epubAuthor || null;
@@ -225,7 +226,7 @@ router.post("/books/import-epub", upload.single("epub"), async (req, res): Promi
       .values({
         title: finalTitle,
         author: finalAuthor,
-        description: null,
+        description: descriptionOverride,
         totalChapters: chapters.length,
         totalWords,
         tags: finalTags,

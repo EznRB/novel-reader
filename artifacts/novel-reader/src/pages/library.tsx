@@ -3,11 +3,14 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   BookOpen, Plus, Heart, Clock, Search, ChevronRight,
-  BarChart2, Flame, User, Trash2,
+  BarChart2, Flame, User, Trash2, ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -174,9 +177,12 @@ function RecentRow({ book }: {
   );
 }
 
+type SortKey = "recent" | "title-asc" | "title-desc" | "favorites" | "progress";
+
 export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("All");
+  const [sort, setSort] = useState<SortKey>("recent");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
   const { data: books, isLoading } = useListBooks();
   const { data: recent } = useGetRecentActivity();
@@ -230,6 +236,21 @@ export default function LibraryPage() {
       (tab === "Favorites" && b.isFavorite) ||
       (tab === "Reading" && (progressMap.get(b.id)?.currentChapter ?? 1) > 1);
     return matchesSearch && matchesTab;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === "title-asc") return a.title.localeCompare(b.title);
+    if (sort === "title-desc") return b.title.localeCompare(a.title);
+    if (sort === "favorites") {
+      if (a.isFavorite === b.isFavorite) return 0;
+      return a.isFavorite ? -1 : 1;
+    }
+    if (sort === "progress") {
+      const pa = progressMap.get(a.id)?.percentComplete ?? 0;
+      const pb = progressMap.get(b.id)?.percentComplete ?? 0;
+      return pb - pa;
+    }
+    return 0; // "recent" — keep API order (updatedAt desc)
   });
 
   const recentActive = (recent ?? []).filter((r) => r.currentChapter > 1 || r.lastReadAt).slice(0, 5);
@@ -313,10 +334,25 @@ export default function LibraryPage() {
 
         {/* Stats bar */}
         {!search && books && books.length > 0 && (
-          <div className="flex items-center gap-6 text-xs text-muted-foreground">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5" />{books.length} novels</span>
             <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" />{books.filter((b) => b.isFavorite).length} favorites</span>
             <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{recentActive.length} in progress</span>
+            <div className="ml-auto">
+              <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+                <SelectTrigger className="h-7 w-auto border-0 bg-transparent text-xs text-muted-foreground gap-1.5 px-2 hover:text-foreground transition-colors focus:ring-0 shadow-none">
+                  <ArrowUpDown className="w-3 h-3" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="recent" className="text-xs">Recently updated</SelectItem>
+                  <SelectItem value="title-asc" className="text-xs">Title A → Z</SelectItem>
+                  <SelectItem value="title-desc" className="text-xs">Title Z → A</SelectItem>
+                  <SelectItem value="favorites" className="text-xs">Favorites first</SelectItem>
+                  <SelectItem value="progress" className="text-xs">Most progress</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
 
@@ -358,7 +394,7 @@ export default function LibraryPage() {
               animate="show"
               className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
             >
-              {filtered.map((book) => (
+              {sorted.map((book) => (
                 <BookCard
                   key={book.id}
                   book={book}

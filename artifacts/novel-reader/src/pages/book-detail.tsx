@@ -303,6 +303,12 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
               )}
             </div>
 
+            {book.description && (
+              <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-book-description">
+                {book.description}
+              </p>
+            )}
+
             {book.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {book.tags.map((t) => (
@@ -449,7 +455,9 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                           <p className={`text-sm font-medium truncate ${isCurrent ? "text-primary" : isRead ? "text-muted-foreground" : "text-foreground"}`}>
                             {ch.title ?? `Chapter ${ch.chapterNumber}`}
                           </p>
-                          <p className="text-[11px] text-muted-foreground">{ch.wordCount.toLocaleString()} words</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {ch.wordCount.toLocaleString()} words · ~{Math.max(1, Math.round(ch.wordCount / 200))} min
+                          </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {isCurrent && <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">Reading</Badge>}

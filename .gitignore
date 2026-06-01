@@ -1,8 +1,17 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# compiled output
-dist
-tmp
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+tmp/
+build/
+out/
+
+# TypeScript build info
+*.tsbuildinfo
 out-tsc
 *.tsbuildinfo
 .expo
