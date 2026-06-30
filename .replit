@@ -30,3 +30,8 @@ externalPort = 8081
 [[ports]]
 localPort = 18942
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+NVIDIA_API_KEY = "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"

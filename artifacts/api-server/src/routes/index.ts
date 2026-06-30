@@ -10,6 +10,7 @@ import ttsRouter from "./tts";
 import exportRouter from "./export";
 import epubImportRouter from "./epub-import";
 import coverRouter from "./cover";
+import knowledgeRouter from "./knowledge";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(ttsRouter);
 router.use(exportRouter);
 router.use(epubImportRouter);
 router.use(coverRouter);
+router.use(knowledgeRouter);
 
 export default router;

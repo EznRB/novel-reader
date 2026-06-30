@@ -19,15 +19,22 @@ import type {
 import type {
   AiAnswer,
   AskBookBody,
+  AssignVoicesResult,
   Book,
+  BookKnowledgeEntity,
+  BookKnowledgeExtractResult,
   BookStats,
   Chapter,
   ChapterSummary,
   Character,
   CreateBookBody,
   HealthStatus,
+  ListTtsVoices200Item,
+  NvidiaSynthesizeBody,
+  NvidiaVoice,
   ReadingProgress,
   RecentBook,
+  SynthesizeSpeechBody,
   UpdateBookBody,
   UpdateReadingProgressBody,
 } from "./api.schemas";
@@ -1230,6 +1237,264 @@ export const useExtractCharacters = <
 };
 
 /**
+ * @summary AI-assign unique voice profiles to all characters
+ */
+export const getAssignCharacterVoicesUrl = (id: number) => {
+  return `/api/books/${id}/characters/assign-voices`;
+};
+
+export const assignCharacterVoices = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AssignVoicesResult> => {
+  return customFetch<AssignVoicesResult>(getAssignCharacterVoicesUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAssignCharacterVoicesMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignCharacterVoices>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assignCharacterVoices>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["assignCharacterVoices"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assignCharacterVoices>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assignCharacterVoices(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssignCharacterVoicesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assignCharacterVoices>>
+>;
+
+export type AssignCharacterVoicesMutationError = ErrorType<void>;
+
+/**
+ * @summary AI-assign unique voice profiles to all characters
+ */
+export const useAssignCharacterVoices = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assignCharacterVoices>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof assignCharacterVoices>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAssignCharacterVoicesMutationOptions(options));
+};
+
+/**
+ * @summary Get all world knowledge entities for a book
+ */
+export const getListBookKnowledgeUrl = (id: number) => {
+  return `/api/books/${id}/knowledge`;
+};
+
+export const listBookKnowledge = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BookKnowledgeEntity[]> => {
+  return customFetch<BookKnowledgeEntity[]>(getListBookKnowledgeUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBookKnowledgeQueryKey = (id: number) => {
+  return [`/api/books/${id}/knowledge`] as const;
+};
+
+export const getListBookKnowledgeQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBookKnowledge>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBookKnowledge>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBookKnowledgeQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBookKnowledge>>
+  > = ({ signal }) => listBookKnowledge(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBookKnowledge>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBookKnowledgeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBookKnowledge>>
+>;
+export type ListBookKnowledgeQueryError = ErrorType<void>;
+
+/**
+ * @summary Get all world knowledge entities for a book
+ */
+
+export function useListBookKnowledge<
+  TData = Awaited<ReturnType<typeof listBookKnowledge>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBookKnowledge>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBookKnowledgeQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary AI-extract world knowledge from chapters read so far
+ */
+export const getExtractBookKnowledgeUrl = (id: number) => {
+  return `/api/books/${id}/knowledge/extract`;
+};
+
+export const extractBookKnowledge = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BookKnowledgeExtractResult> => {
+  return customFetch<BookKnowledgeExtractResult>(
+    getExtractBookKnowledgeUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getExtractBookKnowledgeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof extractBookKnowledge>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof extractBookKnowledge>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["extractBookKnowledge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof extractBookKnowledge>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return extractBookKnowledge(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExtractBookKnowledgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof extractBookKnowledge>>
+>;
+
+export type ExtractBookKnowledgeMutationError = ErrorType<void>;
+
+/**
+ * @summary AI-extract world knowledge from chapters read so far
+ */
+export const useExtractBookKnowledge = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof extractBookKnowledge>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof extractBookKnowledge>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getExtractBookKnowledgeMutationOptions(options));
+};
+
+/**
  * @summary Ask an AI question about the book
  */
 export const getAskAboutBookUrl = (id: number) => {
@@ -1390,3 +1655,325 @@ export function useGetRecentActivity<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List available Microsoft Edge TTS voices
+ */
+export const getListTtsVoicesUrl = () => {
+  return `/api/tts/voices`;
+};
+
+export const listTtsVoices = async (
+  options?: RequestInit,
+): Promise<ListTtsVoices200Item[]> => {
+  return customFetch<ListTtsVoices200Item[]>(getListTtsVoicesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTtsVoicesQueryKey = () => {
+  return [`/api/tts/voices`] as const;
+};
+
+export const getListTtsVoicesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTtsVoices>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTtsVoices>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTtsVoicesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTtsVoices>>> = ({
+    signal,
+  }) => listTtsVoices({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTtsVoices>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTtsVoicesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTtsVoices>>
+>;
+export type ListTtsVoicesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List available Microsoft Edge TTS voices
+ */
+
+export function useListTtsVoices<
+  TData = Awaited<ReturnType<typeof listTtsVoices>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTtsVoices>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTtsVoicesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List available NVIDIA NIM TTS voices
+ */
+export const getListNvidiaVoicesUrl = () => {
+  return `/api/tts/nvidia-voices`;
+};
+
+export const listNvidiaVoices = async (
+  options?: RequestInit,
+): Promise<NvidiaVoice[]> => {
+  return customFetch<NvidiaVoice[]>(getListNvidiaVoicesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListNvidiaVoicesQueryKey = () => {
+  return [`/api/tts/nvidia-voices`] as const;
+};
+
+export const getListNvidiaVoicesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listNvidiaVoices>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listNvidiaVoices>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListNvidiaVoicesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listNvidiaVoices>>
+  > = ({ signal }) => listNvidiaVoices({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listNvidiaVoices>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListNvidiaVoicesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listNvidiaVoices>>
+>;
+export type ListNvidiaVoicesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List available NVIDIA NIM TTS voices
+ */
+
+export function useListNvidiaVoices<
+  TData = Awaited<ReturnType<typeof listNvidiaVoices>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listNvidiaVoices>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListNvidiaVoicesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Synthesize speech using Microsoft Edge TTS
+ */
+export const getSynthesizeSpeechUrl = () => {
+  return `/api/tts/synthesize`;
+};
+
+export const synthesizeSpeech = async (
+  synthesizeSpeechBody: SynthesizeSpeechBody,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getSynthesizeSpeechUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(synthesizeSpeechBody),
+  });
+};
+
+export const getSynthesizeSpeechMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof synthesizeSpeech>>,
+    TError,
+    { data: BodyType<SynthesizeSpeechBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof synthesizeSpeech>>,
+  TError,
+  { data: BodyType<SynthesizeSpeechBody> },
+  TContext
+> => {
+  const mutationKey = ["synthesizeSpeech"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof synthesizeSpeech>>,
+    { data: BodyType<SynthesizeSpeechBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return synthesizeSpeech(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SynthesizeSpeechMutationResult = NonNullable<
+  Awaited<ReturnType<typeof synthesizeSpeech>>
+>;
+export type SynthesizeSpeechMutationBody = BodyType<SynthesizeSpeechBody>;
+export type SynthesizeSpeechMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Synthesize speech using Microsoft Edge TTS
+ */
+export const useSynthesizeSpeech = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof synthesizeSpeech>>,
+    TError,
+    { data: BodyType<SynthesizeSpeechBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof synthesizeSpeech>>,
+  TError,
+  { data: BodyType<SynthesizeSpeechBody> },
+  TContext
+> => {
+  return useMutation(getSynthesizeSpeechMutationOptions(options));
+};
+
+/**
+ * @summary Synthesize speech using NVIDIA NIM TTS (high quality)
+ */
+export const getNvidiaSynthesizeSpeechUrl = () => {
+  return `/api/tts/nvidia-synthesize`;
+};
+
+export const nvidiaSynthesizeSpeech = async (
+  nvidiaSynthesizeBody: NvidiaSynthesizeBody,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getNvidiaSynthesizeSpeechUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(nvidiaSynthesizeBody),
+  });
+};
+
+export const getNvidiaSynthesizeSpeechMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof nvidiaSynthesizeSpeech>>,
+    TError,
+    { data: BodyType<NvidiaSynthesizeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof nvidiaSynthesizeSpeech>>,
+  TError,
+  { data: BodyType<NvidiaSynthesizeBody> },
+  TContext
+> => {
+  const mutationKey = ["nvidiaSynthesizeSpeech"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof nvidiaSynthesizeSpeech>>,
+    { data: BodyType<NvidiaSynthesizeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return nvidiaSynthesizeSpeech(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NvidiaSynthesizeSpeechMutationResult = NonNullable<
+  Awaited<ReturnType<typeof nvidiaSynthesizeSpeech>>
+>;
+export type NvidiaSynthesizeSpeechMutationBody = BodyType<NvidiaSynthesizeBody>;
+export type NvidiaSynthesizeSpeechMutationError = ErrorType<void>;
+
+/**
+ * @summary Synthesize speech using NVIDIA NIM TTS (high quality)
+ */
+export const useNvidiaSynthesizeSpeech = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof nvidiaSynthesizeSpeech>>,
+    TError,
+    { data: BodyType<NvidiaSynthesizeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof nvidiaSynthesizeSpeech>>,
+  TError,
+  { data: BodyType<NvidiaSynthesizeBody> },
+  TContext
+> => {
+  return useMutation(getNvidiaSynthesizeSpeechMutationOptions(options));
+};

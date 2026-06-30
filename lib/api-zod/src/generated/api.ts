@@ -202,6 +202,11 @@ export const GetChapterSummaryResponse = zod.object({
   chapterId: zod.number(),
   chapterNumber: zod.number(),
   summary: zod.string(),
+  quickSummary: zod.string().nullish(),
+  charactersPresent: zod.array(zod.string()).nullish(),
+  keyEvents: zod.array(zod.string()).nullish(),
+  revelations: zod.array(zod.string()).nullish(),
+  powerChanges: zod.array(zod.string()).nullish(),
   createdAt: zod.coerce.date(),
 });
 
@@ -219,6 +224,8 @@ export const ListCharactersResponseItem = zod.object({
   description: zod.string().nullish(),
   role: zod.string().nullish(),
   firstAppearanceChapter: zod.number().nullish(),
+  gender: zod.string().nullish(),
+  assignedVoice: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListCharactersResponse = zod.array(ListCharactersResponseItem);
@@ -237,11 +244,104 @@ export const ExtractCharactersResponseItem = zod.object({
   description: zod.string().nullish(),
   role: zod.string().nullish(),
   firstAppearanceChapter: zod.number().nullish(),
+  gender: zod.string().nullish(),
+  assignedVoice: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ExtractCharactersResponse = zod.array(
   ExtractCharactersResponseItem,
 );
+
+/**
+ * @summary AI-assign unique voice profiles to all characters
+ */
+export const AssignCharacterVoicesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AssignCharacterVoicesResponse = zod.object({
+  characters: zod.array(
+    zod.object({
+      id: zod.number(),
+      bookId: zod.number(),
+      name: zod.string(),
+      description: zod.string().nullish(),
+      role: zod.string().nullish(),
+      firstAppearanceChapter: zod.number().nullish(),
+      gender: zod.string().nullish(),
+      assignedVoice: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  narratorVoice: zod.string(),
+});
+
+/**
+ * @summary Get all world knowledge entities for a book
+ */
+export const ListBookKnowledgeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListBookKnowledgeResponseItem = zod.object({
+  id: zod.number(),
+  bookId: zod.number(),
+  entityType: zod.enum([
+    "character",
+    "organization",
+    "faction",
+    "kingdom",
+    "location",
+    "skill",
+    "artifact",
+    "event",
+  ]),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  firstAppearanceChapter: zod.number().nullish(),
+  lastMentionedChapter: zod.number().nullish(),
+  metadata: zod.unknown().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListBookKnowledgeResponse = zod.array(
+  ListBookKnowledgeResponseItem,
+);
+
+/**
+ * @summary AI-extract world knowledge from chapters read so far
+ */
+export const ExtractBookKnowledgeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ExtractBookKnowledgeResponse = zod.object({
+  entities: zod.array(
+    zod.object({
+      id: zod.number(),
+      bookId: zod.number(),
+      entityType: zod.enum([
+        "character",
+        "organization",
+        "faction",
+        "kingdom",
+        "location",
+        "skill",
+        "artifact",
+        "event",
+      ]),
+      name: zod.string(),
+      description: zod.string().nullish(),
+      firstAppearanceChapter: zod.number().nullish(),
+      lastMentionedChapter: zod.number().nullish(),
+      metadata: zod.unknown().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  extractedFromChapter: zod.number(),
+  totalEntities: zod.number(),
+});
 
 /**
  * @summary Ask an AI question about the book
@@ -277,3 +377,39 @@ export const GetRecentActivityResponseItem = zod.object({
 export const GetRecentActivityResponse = zod.array(
   GetRecentActivityResponseItem,
 );
+
+/**
+ * @summary List available Microsoft Edge TTS voices
+ */
+export const ListTtsVoicesResponseItem = zod.object({}).passthrough();
+export const ListTtsVoicesResponse = zod.array(ListTtsVoicesResponseItem);
+
+/**
+ * @summary List available NVIDIA NIM TTS voices
+ */
+export const ListNvidiaVoicesResponseItem = zod.object({
+  id: zod.string(),
+  label: zod.string(),
+  gender: zod.string(),
+});
+export const ListNvidiaVoicesResponse = zod.array(ListNvidiaVoicesResponseItem);
+
+/**
+ * @summary Synthesize speech using Microsoft Edge TTS
+ */
+export const SynthesizeSpeechBody = zod.object({
+  text: zod.string(),
+  voice: zod.string().optional(),
+  rate: zod.number().optional(),
+  style: zod.string().optional(),
+});
+
+/**
+ * @summary Synthesize speech using NVIDIA NIM TTS (high quality)
+ */
+export const NvidiaSynthesizeSpeechBody = zod.object({
+  text: zod.string(),
+  voice: zod.string().optional(),
+  speed: zod.number().optional(),
+  language: zod.string().optional(),
+});

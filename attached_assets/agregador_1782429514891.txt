@@ -1,0 +1,329 @@
+# PLATAFORMA COMO AGREGADOR COLABORATIVO (RECURSO ESSENCIAL)
+
+A aplicação deve funcionar como um **grande agregador colaborativo de obras**, semelhante a uma combinação entre **MyAnimeList, Novel Updates, Goodreads e Wikipédia**, onde a comunidade é responsável pela construção, organização e evolução do catálogo.
+
+**A plataforma não será responsável por adicionar manualmente livros, novels, web novels, fanfics, mangás ou outras obras.**
+
+Toda a catalogação será realizada pelos próprios usuários.
+
+O objetivo é criar uma biblioteca digital extremamente organizada e escalável, permitindo que milhões de obras sejam catalogadas pela própria comunidade, reduzindo o trabalho manual da equipe da plataforma e tornando o crescimento praticamente ilimitado.
+
+---
+
+# OBJETIVO DO AGREGADOR
+
+Criar uma biblioteca digital onde os usuários possam:
+
+* Adicionar novas obras.
+* Adicionar volumes.
+* Adicionar capítulos.
+* Adicionar capas.
+* Adicionar sinopses.
+* Adicionar autores.
+* Adicionar ilustradores.
+* Adicionar editoras.
+* Adicionar gêneros.
+* Adicionar subgêneros.
+* Adicionar tags.
+* Adicionar informações da obra.
+* Atualizar status da obra.
+* Corrigir metadados incorretos.
+* Corrigir capítulos.
+* Melhorar continuamente a qualidade do catálogo.
+
+Todo histórico de alterações deve ser registrado para permitir auditoria, reversão e rastreamento das contribuições realizadas por cada usuário.
+
+---
+
+# ESTRUTURA DA BIBLIOTECA
+
+O sistema deverá funcionar como uma enorme biblioteca colaborativa.
+
+Cada obra possuirá uma estrutura organizada contendo:
+
+* Informações gerais
+* Autor
+* Artista
+* Sinopse
+* Capa
+* Gêneros
+* Tags
+* Idioma
+* País de origem
+* Status
+* Número de volumes
+* Número de capítulos
+* Avaliações
+* Comentários
+* Histórico de atualizações
+* Estatísticas de leitura
+* Estatísticas de audição
+
+Os capítulos deverão ser organizados automaticamente dentro de seus respectivos volumes, facilitando a navegação do usuário.
+
+---
+
+# RESPONSABILIDADE PELO CONTEÚDO
+
+A plataforma atua exclusivamente como **intermediária tecnológica**, fornecendo infraestrutura para organização, descoberta de conteúdo, leitura, audiolivros gerados por IA e recursos sociais.
+
+**Todo conteúdo disponibilizado será enviado pelos próprios usuários.**
+
+A plataforma não realizará publicação manual das obras.
+
+Cada usuário será responsável pelo conteúdo que publicar.
+
+Ao cadastrar uma obra ou enviar capítulos, o usuário deverá aceitar termos específicos declarando que:
+
+* Possui autorização para publicar o conteúdo.
+* É detentor dos direitos autorais.
+* Ou o conteúdo encontra-se em domínio público.
+* Ou possui licença que permite compartilhamento.
+
+Esses termos devem ser aceitos explicitamente antes de qualquer envio.
+
+---
+
+# SISTEMA DE CONTRIBUIÇÃO DA COMUNIDADE
+
+Os usuários poderão:
+
+* Adicionar obras.
+* Adicionar volumes.
+* Adicionar capítulos.
+* Corrigir informações.
+* Atualizar metadados.
+* Corrigir capítulos.
+* Adicionar capas.
+* Adicionar sinopses.
+* Adicionar novos gêneros.
+* Adicionar novas tags.
+* Reportar informações incorretas.
+* Sugerir melhorias.
+
+Cada alteração ficará vinculada ao usuário responsável.
+
+Todas as contribuições deverão possuir:
+
+* Data.
+* Hora.
+* Usuário responsável.
+* Histórico completo.
+* Sistema de reversão.
+
+---
+
+# CURADORIA DA COMUNIDADE
+
+Criar um sistema de reputação para aumentar a confiabilidade do catálogo.
+
+Exemplo de hierarquia:
+
+### Usuário comum
+
+* Pode sugerir alterações.
+
+### Contribuidor
+
+* Pode adicionar obras e capítulos.
+
+### Curador
+
+* Pode aprovar ou rejeitar alterações.
+
+### Moderador
+
+* Pode remover conteúdo.
+* Aplicar punições.
+* Resolver denúncias.
+
+### Administrador
+
+* Controle total do sistema.
+
+Usuários com maior reputação terão permissões ampliadas.
+
+---
+
+# SISTEMA DE MODERAÇÃO
+
+Implementar um sistema robusto de moderação.
+
+Permitir:
+
+* Denúncia de obras.
+* Denúncia de capítulos.
+* Denúncia de usuários.
+* Denúncia de comentários.
+* Solicitação de remoção por copyright.
+* Revisão manual por moderadores.
+* Revisão automática utilizando IA.
+* Fila de moderação.
+* Histórico de todas as ações realizadas.
+
+Sempre registrar logs completos das decisões tomadas.
+
+---
+
+# SISTEMA DE COPYRIGHT / REMOÇÃO DE CONTEÚDO
+
+Implementar um fluxo semelhante ao utilizado por plataformas como YouTube, Reddit, Discord e GitHub.
+
+Disponibilizar:
+
+* Formulário oficial para denúncias de copyright.
+* Canal oficial de contato.
+* Processo automatizado para abertura de solicitações.
+* Painel administrativo para gerenciamento das solicitações.
+* Registro completo das notificações recebidas.
+
+Implementar um sistema de remoção rápida para conteúdos que infrinjam direitos autorais.
+
+Criar também um sistema de "strikes" para usuários reincidentes:
+
+* Primeira infração → Advertência.
+* Segunda infração → Suspensão temporária.
+* Reincidência → Banimento permanente.
+
+---
+
+# SISTEMA DE FILTROS AVANÇADOS
+
+Como o catálogo poderá crescer para milhões de obras, desenvolver um sistema de pesquisa extremamente completo.
+
+Permitir filtros por:
+
+## Informações básicas
+
+* Gênero
+* Subgênero
+* Autor
+* Artista
+* Nacionalidade
+* Idioma
+* Ano de publicação
+
+## Status
+
+* Em andamento
+* Completa
+* Hiato
+* Cancelada
+
+## Popularidade
+
+* Mais lidas
+* Mais ouvidas
+* Mais favoritados
+* Mais avaliadas
+* Mais comentadas
+* Tendências
+
+## Comunidade
+
+* Melhor avaliação
+* Crescimento da semana
+* Crescimento do mês
+* Mais recomendadas
+
+## Recursos
+
+* Possui audiolivro
+* Possui múltiplas vozes
+* Narração premium
+* Download disponível
+
+---
+
+# SISTEMA DE TAGS
+
+Criar um sistema extremamente detalhado de tags.
+
+Exemplos:
+
+* Progressão de poder
+* Cultivação
+* Sistema
+* LitRPG
+* Reencarnação
+* Fantasia
+* Fantasia Sombria
+* Sci-Fi
+* Horror
+* Mistério
+* Romance
+* Comédia
+* Slice of Life
+* Aventura
+* Estratégia
+* Apocalipse
+* Viagem no Tempo
+
+O sistema deverá permitir múltiplas tags por obra.
+
+---
+
+# DESCOBERTA INTELIGENTE
+
+Implementar algoritmos de recomendação baseados em IA.
+
+Exibir automaticamente:
+
+* Obras semelhantes.
+* Usuários também leram.
+* Usuários também ouviram.
+* Tendências.
+* Em alta.
+* Recomendadas para você.
+* Continuação da leitura.
+* Obras similares às favoritas.
+
+---
+
+# SEGURANÇA DO AGREGADOR
+
+Como qualquer usuário poderá contribuir com o catálogo, implementar mecanismos robustos de proteção contra abuso.
+
+Proteger contra:
+
+* Spam de cadastro de obras.
+* Bots automatizados.
+* Uploads maliciosos.
+* Conteúdo duplicado.
+* Flood.
+* Scraping abusivo.
+* Manipulação de avaliações.
+* Manipulação de rankings.
+* Criação massiva de contas.
+* Ataques automatizados.
+
+Implementar:
+
+* Rate Limiting.
+* CAPTCHA adaptativo.
+* Sistema de reputação.
+* Detecção automática de comportamento suspeito por IA.
+* Logs completos de auditoria.
+* Monitoramento em tempo real.
+* Bloqueio automático de atividades maliciosas.
+
+---
+
+# OBJETIVO FINAL
+
+Transformar a aplicação em uma **gigantesca biblioteca colaborativa de leitura e audiolivros com IA**, onde a comunidade constrói e mantém o catálogo enquanto a plataforma fornece toda a infraestrutura tecnológica.
+
+A plataforma deve oferecer:
+
+* Organização inteligente do catálogo.
+* Descoberta avançada de conteúdo.
+* Narração por IA com múltiplas vozes.
+* Recursos sociais.
+* Gamificação.
+* Recomendações inteligentes.
+* Moderação eficiente.
+* Segurança de nível corporativo.
+* Alta disponibilidade.
+* Escalabilidade para milhões de usuários e milhões de obras.
+
+O resultado esperado é uma plataforma capaz de competir em qualidade e experiência com serviços como Goodreads, Audible, Novel Updates, Spotify e MyAnimeList, porém especializada em leitura, audiolivros gerados por IA e gerenciamento colaborativo de obras.

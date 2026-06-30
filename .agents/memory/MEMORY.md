@@ -1,1 +1,2 @@
 - [AudioPlayer ref pattern](audio-player-ref-pattern.md) — Audio element must be created once (empty deps); use prop refs to avoid stuck-loading bug from cascading useCallback deps.
+- [useLocalStorage setter type](uselocalstorage-setter.md) — The useLocalStorage hook returns (v: T) => void, NOT a React state setter; never pass functional updaters like (v) => !v; use the current value directly.

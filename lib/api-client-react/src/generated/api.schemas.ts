@@ -88,6 +88,16 @@ export interface ChapterSummary {
   chapterId: number;
   chapterNumber: number;
   summary: string;
+  /** @nullable */
+  quickSummary?: string | null;
+  /** @nullable */
+  charactersPresent?: string[] | null;
+  /** @nullable */
+  keyEvents?: string[] | null;
+  /** @nullable */
+  revelations?: string[] | null;
+  /** @nullable */
+  powerChanges?: string[] | null;
   createdAt: string;
 }
 
@@ -101,7 +111,52 @@ export interface Character {
   role?: string | null;
   /** @nullable */
   firstAppearanceChapter?: number | null;
+  /** @nullable */
+  gender?: string | null;
+  /** @nullable */
+  assignedVoice?: string | null;
   createdAt: string;
+}
+
+export interface AssignVoicesResult {
+  characters: Character[];
+  narratorVoice: string;
+}
+
+export type BookKnowledgeEntityEntityType =
+  (typeof BookKnowledgeEntityEntityType)[keyof typeof BookKnowledgeEntityEntityType];
+
+export const BookKnowledgeEntityEntityType = {
+  character: "character",
+  organization: "organization",
+  faction: "faction",
+  kingdom: "kingdom",
+  location: "location",
+  skill: "skill",
+  artifact: "artifact",
+  event: "event",
+} as const;
+
+export interface BookKnowledgeEntity {
+  id: number;
+  bookId: number;
+  entityType: BookKnowledgeEntityEntityType;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  firstAppearanceChapter?: number | null;
+  /** @nullable */
+  lastMentionedChapter?: number | null;
+  metadata?: unknown | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookKnowledgeExtractResult {
+  entities: BookKnowledgeEntity[];
+  extractedFromChapter: number;
+  totalEntities: number;
 }
 
 export interface AskBookBody {
@@ -129,3 +184,25 @@ export interface RecentBook {
   lastReadAt?: string | null;
   isFavorite: boolean;
 }
+
+export interface NvidiaVoice {
+  id: string;
+  label: string;
+  gender: string;
+}
+
+export interface SynthesizeSpeechBody {
+  text: string;
+  voice?: string;
+  rate?: number;
+  style?: string;
+}
+
+export interface NvidiaSynthesizeBody {
+  text: string;
+  voice?: string;
+  speed?: number;
+  language?: string;
+}
+
+export type ListTtsVoices200Item = { [key: string]: unknown };

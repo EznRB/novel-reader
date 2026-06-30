@@ -22,6 +22,10 @@ tags:
     description: Character memory and tracking
   - name: ai
     description: AI Q&A and analysis
+  - name: knowledge
+    description: Book memory system — world knowledge entities
+  - name: tts
+    description: Text-to-speech synthesis
 
 paths:
   /healthz:
@@ -322,6 +326,71 @@ paths:
         "404":
           description: Book not found
 
+  /books/{id}/characters/assign-voices:
+    post:
+      operationId: assignCharacterVoices
+      tags: [characters]
+      summary: AI-assign unique voice profiles to all characters
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Characters with assigned voices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignVoicesResult"
+        "404":
+          description: Book not found
+
+  /books/{id}/knowledge:
+    get:
+      operationId: listBookKnowledge
+      tags: [knowledge]
+      summary: Get all world knowledge entities for a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of knowledge entities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BookKnowledgeEntity"
+        "404":
+          description: Book not found
+
+  /books/{id}/knowledge/extract:
+    post:
+      operationId: extractBookKnowledge
+      tags: [knowledge]
+      summary: AI-extract world knowledge from chapters read so far
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Extraction result with all entities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookKnowledgeExtractResult"
+        "404":
+          description: Book not found
+
   /books/{id}/ask:
     post:
       operationId: askAboutBook
@@ -363,6 +432,78 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/RecentBook"
+
+  /tts/voices:
+    get:
+      operationId: listTtsVoices
+      tags: [tts]
+      summary: List available Microsoft Edge TTS voices
+      responses:
+        "200":
+          description: Available voices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /tts/nvidia-voices:
+    get:
+      operationId: listNvidiaVoices
+      tags: [tts]
+      summary: List available NVIDIA NIM TTS voices
+      responses:
+        "200":
+          description: Available NVIDIA voices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NvidiaVoice"
+
+  /tts/synthesize:
+    post:
+      operationId: synthesizeSpeech
+      tags: [tts]
+      summary: Synthesize speech using Microsoft Edge TTS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SynthesizeSpeechBody"
+      responses:
+        "200":
+          description: Audio stream (audio/mpeg)
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+
+  /tts/nvidia-synthesize:
+    post:
+      operationId: nvidiaSynthesizeSpeech
+      tags: [tts]
+      summary: Synthesize speech using NVIDIA NIM TTS (high quality)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NvidiaSynthesizeBody"
+      responses:
+        "200":
+          description: Audio stream (audio/mpeg)
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        "503":
+          description: NVIDIA API not configured
 
 components:
   schemas:
@@ -543,6 +684,24 @@ components:
           type: integer
         summary:
           type: string
+        quickSummary:
+          type: ["string", "null"]
+        charactersPresent:
+          type: ["array", "null"]
+          items:
+            type: string
+        keyEvents:
+          type: ["array", "null"]
+          items:
+            type: string
+        revelations:
+          type: ["array", "null"]
+          items:
+            type: string
+        powerChanges:
+          type: ["array", "null"]
+          items:
+            type: string
         createdAt:
           type: string
           format: date-time
@@ -568,6 +727,10 @@ components:
           type: ["string", "null"]
         firstAppearanceChapter:
           type: ["integer", "null"]
+        gender:
+          type: ["string", "null"]
+        assignedVoice:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -576,6 +739,69 @@ components:
         - bookId
         - name
         - createdAt
+
+    AssignVoicesResult:
+      type: object
+      properties:
+        characters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Character"
+        narratorVoice:
+          type: string
+      required:
+        - characters
+        - narratorVoice
+
+    BookKnowledgeEntity:
+      type: object
+      properties:
+        id:
+          type: integer
+        bookId:
+          type: integer
+        entityType:
+          type: string
+          enum: [character, organization, faction, kingdom, location, skill, artifact, event]
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        firstAppearanceChapter:
+          type: ["integer", "null"]
+        lastMentionedChapter:
+          type: ["integer", "null"]
+        metadata:
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookId
+        - entityType
+        - name
+        - createdAt
+        - updatedAt
+
+    BookKnowledgeExtractResult:
+      type: object
+      properties:
+        entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookKnowledgeEntity"
+        extractedFromChapter:
+          type: integer
+        totalEntities:
+          type: integer
+      required:
+        - entities
+        - extractedFromChapter
+        - totalEntities
 
     AskBookBody:
       type: object
@@ -627,3 +853,45 @@ components:
         - totalChapters
         - percentComplete
         - isFavorite
+
+    NvidiaVoice:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        gender:
+          type: string
+      required:
+        - id
+        - label
+        - gender
+
+    SynthesizeSpeechBody:
+      type: object
+      properties:
+        text:
+          type: string
+        voice:
+          type: string
+        rate:
+          type: number
+        style:
+          type: string
+      required:
+        - text
+
+    NvidiaSynthesizeBody:
+      type: object
+      properties:
+        text:
+          type: string
+        voice:
+          type: string
+        speed:
+          type: number
+        language:
+          type: string
+      required:
+        - text

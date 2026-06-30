@@ -1,0 +1,479 @@
+Analise profundamente toda a estrutura do projeto atual e implemente as funcionalidades descritas abaixo seguindo as melhores práticas de arquitetura, performance, UX/UI, escalabilidade e segurança.
+
+IMPORTANTE:
+
+Não remover funcionalidades existentes.
+Não quebrar funcionalidades já implementadas.
+Manter compatibilidade com o banco de dados atual.
+Refatorar apenas quando realmente necessário.
+Sempre priorizar performance e experiência do usuário.
+Todas as funcionalidades devem ser integradas ao sistema atual.
+Antes de implementar qualquer alteração, entender completamente a arquitetura existente.
+
+Detecção de Personagens e Vozes Características
+Para melhorar a clareza da narração, o sistema precisa identificar automaticamente personagens e diálogos no texto e atribuir uma voz única a cada personagem. Isso envolve análise de linguagem natural (reconhecimento de entidades e estrutura de diálogos) para detectar quando muda o narrador. Em seguida, cada personagem teria uma “voz” consistente – por exemplo, uma voz masculina grave para o herói, outra feminina suave para a protagonista, etc. Plataformas de audiolivros baseadas em IA já aplicam esse conceito: o serviço BookNPC “identifica automaticamente narrador e diálogos de personagens” e cria uma experiência de “drama com elencagem completa”, atribuindo vozes distintas a cada personagem. A adoção de modelos TTS multitom (que suportam vários locutores) e técnicas de clonagem de voz zero-shot permite gerar vozes coerentes: por exemplo, o NVIDIA Riva Magpie TTS Zeroshot/Flow pode clonar uma voz de personagem com apenas alguns segundos de áudio de referência. Dessa forma, evita-se que o narrador troque aleatoriamente de timbre ou de idioma durante a narração (um problema relatado em ferramentas atuais) e garante que o ouvinte reconheça claramente cada personagem pelo seu timbre próprio.
+
+Modelos de Áudio AI Gratuitos (NVIDIA e Alternativas)
+A NVIDIA oferece modelos de síntese de fala de alto nível gratuitamente via sua plataforma Riva/Nemotron. Por exemplo, os modelos Magpie TTS Multilingual e Magpie TTS Zeroshot produzem vozes naturais em múltiplos idiomas e permitem clonagem de voz. Na prática, há endpoints gratuitos (NIM) para esses modelos, dando acesso a TTS expressivo em várias línguas. O blog técnico da NVIDIA destaca que esses modelos alcançam excelente naturalidade e aderência ao texto, suportando casos de uso como audiolivros e dublagem. Como alternativa ao ecossistema NVIDIA, existem vários modelos TTS open-source de alta qualidade. Por exemplo, há projetos de ponta em repositórios públicos (Hugging Face, GitHub) como Chatterbox, Kokoro e Dia. Segundo análises recentes, o cenário TTS está em rápida evolução, com muitos modelos open-source capazes de gerar fala quase humana e até realizar clonagem de voz em poucos segundos. Outras opções incluem bibliotecas como Mozilla TTS/Coqui, engines comerciais com camadas gratuitas (por exemplo Amazon Polly ou Google WaveNet em nível limitado) e APIs como o ElevenLabs ou o Google Play Livros (que anunciou melhoria de detecção de personagens). Em resumo, além dos recursos NVIDIA, pode-se recorrer a soluções livremente disponíveis de TTS e voz personalizada para implementar vozes variadas sem custos de licença.
+
+Autoplay, Resumos de Capítulos e Transições Suaves
+O player deve oferecer reprodução contínua (autoplay): ao interromper a leitura, o usuário deve retomar de onde parou, e os capítulos seguintes devem iniciar automaticamente. Tecnologias existentes já suportam isso (por exemplo, aplicativos de audiobook mantêm posição sincronizada entre dispositivos e reproduzem em sequência sem pausas perceptíveis). Para transições limpas, é possível aplicar crossfade curto ou buffer antecipado entre os áudios, evitando cortes abruptos. Além disso, a cada final de capítulo pode ser gerado um breve resumo automatizado do conteúdo. Isso ajuda o ouvinte a lembrar eventos-chave e personagens importantes. Plataformas modernas usam chatbots ou LLMs integrados para esse fim: por exemplo, o serviço Easyreads permite ao usuário pedir “resumo do capítulo” via um chat de IA. Dessa forma, a cada conclusão de capítulo o sistema pode acionar um modelo de resumo que condensará os pontos principais da trama. Esses resumos (ou flashbacks curtos narrados) preservam as informações-chave já reveladas, ajudando o leitor a não se perder na história mesmo após pausas na audição. Em conjunto, essas funcionalidades (continuidade da reprodução e recapitulações automáticas) tornam a experiência de ouvir o livro mais fluida e compreensível.
+
+Engajamento de Usuários: Perfis, Gamificação e Recompensas
+A arquitetura de usuários deve contemplar perfís públicos, listas de amigos e elementos sociais/gamificados. Cada usuário teria um perfil visível com foto, banner, histórico de leitura etc. O sistema poderia incluir um ranking de “principais leitores” (por total de capítulos concluídos, avaliações de obras, etc.) e recompensas visuais como insígnias ou banners para conquistas (por exemplo, “100 capítulos lidos” ou “amigo número 1” etc.). Estudos de gamificação no incentivo à leitura mostram que “recursos de gamificação como badges, streaks de leitura, conquistas, amizades e placares motivam todos os tipos de leitores”. Ou seja, implementar badges virtuais e streaks (dias consecutivos de leitura) engaja usuários. Perfis públicos e lista de amigos permitem interações sociais (seguir leitores, ver o que eles estão ouvindo) e reforçam o compromisso com a plataforma. Em suma, o sistema pode oferecer recompensas digitais (avatares personalizados, banners exibidos no perfil) que reforçam o envolvimento, como fazem apps educacionais e de leitura que usam desafios e insígnias.
+
+Monetização e Modelos de Assinatura
+O modelo de negócio pode seguir o formato freemium comum em conteúdo digital. A proposta inclui teste grátis de 7 dias e, após isso, acesso limitado no plano gratuito (por exemplo, máximo de 10 capítulos por mês). Para continuar ouvindo além do limite, o usuário pode assinar a versão premium, que elimina restrições (capítulos ilimitados, recursos exclusivos). Essa abordagem é usada em muitos serviços de mídia: libera acesso inicial sem custo para atrair usuários e depois converte parte deles em assinantes. Por exemplo, plataformas de e-books e áudio costumam oferecer uma amostra gratuita seguida de assinatura com benefícios. Além de assinaturas, podem existir micropagamentos (“pague por volume lido”) ou compra de pacotes de capítulos. Mas em geral, o fluxo sugerido – período gratuito, depois plano básico limitado versus plano premium – é uma prática consolidada para equilibrar adoção e receita.
+
+Segurança, Privacidade e Escalabilidade
+Por envolver milhares de usuários e dados pessoais, o sistema deve ser projetado com segurança robusta e escalabilidade desde o início. Na parte de segurança, recomenda-se seguir padrões consagrados: autenticação forte (hash de senhas com bcrypt/Argon2, 2FA opcional), comunicação criptografada (HTTPS/TLS), validações do lado servidor e uso de tokens JWT bem protegidos. É essencial realizar testes de segurança regulares (pentests) focados nas principais ameaças. Por exemplo, a comunidade OWASP define listas de vulnerabilidades críticas para web e mobile que servem de guia. O OWASP Top Ten Web (2025) destaca riscos como injeção de código, autenticação quebrada e exposures de dados. O OWASP Mobile Top 10 (2024) lista itens como uso impróprio de credenciais, comunicação insegura e armazenamento inseguro. O sistema deve ser testado contra esses pontos (por exemplo, evitar XSS/CSRF, proteger o armazenamento de tokens e dados sensíveis). Também é importante seguir normas de proteção de dados (como a LGPD no Brasil), encriptando dados pessoais e coletando apenas o necessário. Para escalar com segurança, arquiteturas em nuvem (cloud) com balanceamento de carga, isolamento de serviços (microserviços), logs auditáveis e Firewalls de aplicação (WAF) podem ser usados. Resumindo, um processo de segurança “shift-left” (análise de código seguro, revisões e testes de intrusão) aliado a bons controles de infraestrutura garantirá que o sistema suporte muitos usuários sem comprometer dados.
+
+Fontes: As recomendações acima se baseiam em estudos de texto-para-fala (NVIDIA Riva), relatos de ferramentas de IA atuais (ElevenLabs, BookNPC), e práticas de gamificação e segurança amplamente documentadas.
+
+MELHORIAS NO SISTEMA DE NARRAÇÃO IA
+Vozes inteligentes para personagens
+
+Implementar um sistema de IA capaz de:
+
+Detectar automaticamente personagens da história.
+Detectar diálogos.
+Diferenciar narrador e personagens.
+Criar uma voz consistente para cada personagem.
+Manter a mesma voz durante toda a obra.
+Gerar vozes coerentes com:
+idade
+personalidade
+papel narrativo
+gênero do personagem
+
+Exemplos:
+
+Criança → voz jovem
+Guerreiro veterano → voz grave
+Vilão elegante → voz refinada
+Personagem feminina jovem → voz suave
+
+A atribuição de vozes deve ser automática.
+
+Correção da qualidade da narração
+
+Resolver problemas encontrados atualmente:
+
+Pausas incorretas.
+Entonação artificial.
+Leitura robótica.
+Mudanças inesperadas de idioma.
+Pronúncia incorreta de nomes.
+Problemas de pontuação.
+Problemas de concordância.
+Mudança aleatória de voz.
+
+Implementar pré-processamento inteligente do texto antes da síntese de voz.
+
+O sistema deve compreender:
+
+contexto
+emoção
+intensidade
+suspense
+humor
+sarcasmo
+tristeza
+raiva
+
+para gerar uma narração mais natural.
+
+SISTEMA DE MEMÓRIA DA OBRA
+
+Criar uma base de conhecimento automática para cada obra.
+
+A IA deve armazenar:
+
+personagens importantes
+organizações
+facções
+reinos
+habilidades
+poderes
+artefatos
+locais
+eventos importantes
+
+A memória deve ser atualizada automaticamente conforme novos capítulos são lidos.
+
+Essa memória será utilizada para:
+
+melhorar a narração
+melhorar os resumos
+melhorar recomendações
+evitar inconsistências
+RESUMOS AUTOMÁTICOS
+
+Ao final de cada capítulo gerar:
+
+Resumo rápido
+
+Entre 30 segundos e 1 minuto.
+
+Resumo completo
+
+Entre 1 e 3 minutos.
+
+Informações importantes
+
+Exibir automaticamente:
+
+Personagens importantes
+
+Quem apareceu no capítulo.
+
+Eventos importantes
+
+Principais acontecimentos.
+
+Revelações
+
+Novas informações descobertas.
+
+Mudanças de poder
+
+Novas habilidades ou evoluções.
+
+Informações que o leitor precisa lembrar.
+
+Esses dados devem ficar disponíveis em uma aba:
+
+"Memória da História"
+
+SISTEMA DE AUTOPLAY
+
+Implementar reprodução contínua.
+
+Funcionalidades:
+
+Continuar exatamente de onde o usuário parou.
+Avançar automaticamente para o próximo capítulo.
+Reprodução sem interrupções.
+Pré-carregamento do próximo capítulo.
+Sincronização entre dispositivos.
+Modo maratona.
+
+Adicionar configuração:
+
+Ativar/desativar autoplay.
+Tempo entre capítulos.
+Crossfade opcional.
+TRANSIÇÕES DE ÁUDIO
+
+Melhorar significativamente a experiência sonora.
+
+Implementar:
+
+Crossfade.
+Normalização de volume.
+Eliminação de cortes bruscos.
+Buffer inteligente.
+Pré-carregamento do próximo áudio.
+
+Objetivo:
+
+Experiência semelhante ao Spotify.
+
+PERFIS PÚBLICOS
+
+Adicionar sistema de perfil público.
+
+Informações:
+
+Foto.
+Banner.
+Bio.
+Obras favoritas.
+Horas ouvidas.
+Capítulos concluídos.
+Ranking.
+SISTEMA DE AMIGOS
+
+Implementar:
+
+Adicionar amigos.
+Remover amigos.
+Seguir usuários.
+Lista de seguidores.
+Lista de seguindo.
+GAMIFICAÇÃO
+
+Criar sistema de progressão.
+
+Conceder experiência por:
+
+Ler capítulos.
+Ouvir capítulos.
+Avaliar obras.
+Contribuir com catálogo.
+Recompensas
+
+Desbloquear:
+
+Banners.
+Fotos de perfil.
+Molduras.
+Insígnias.
+Títulos.
+RANKING GLOBAL
+
+Criar rankings:
+
+Leitores.
+Ouvintes.
+Contribuidores.
+
+Filtros:
+
+Diário.
+Semanal.
+Mensal.
+Global.
+SISTEMA DE FILTROS AVANÇADOS
+
+Expandir sistema de descoberta.
+
+Permitir filtrar por:
+
+gênero
+subgênero
+avaliação
+popularidade
+número de leitores
+número de ouvintes
+status da obra
+idioma
+autor
+Tags avançadas
+
+Exemplos:
+
+Progressão de poder
+Cultivação
+LitRPG
+Sistema
+Reencarnação
+Fantasia
+Romance
+Horror
+Mistério
+Sci-Fi
+SISTEMA DE RECOMENDAÇÃO
+
+Criar recomendações inteligentes.
+
+Baseadas em:
+
+histórico de leitura
+histórico de audição
+obras favoritas
+comportamento de usuários semelhantes
+
+Exibir:
+
+Obras parecidas.
+Usuários também ouviram.
+Em alta.
+Tendências.
+MONETIZAÇÃO
+
+Implementar sistema freemium.
+
+Plano Gratuito
+7 dias gratuitos.
+Limite de capítulos.
+Limite de horas de áudio.
+Premium
+Capítulos ilimitados.
+Áudio ilimitado.
+Vozes premium.
+Sem anúncios.
+Recursos exclusivos.
+SEGURANÇA
+
+Fortalecer significativamente a segurança.
+
+Implementar:
+
+Rate Limiting.
+Proteção contra bots.
+Proteção contra scraping.
+Proteção contra spam.
+Proteção contra abuso de API.
+Logs de auditoria.
+MFA opcional.
+Sessões seguras.
+Monitoramento de atividades suspeitas.
+OBJETIVO FINAL
+
+Transformar a aplicação atual em uma plataforma de leitura e audiolivros baseada em IA de nível comercial, com experiência comparável ou superior a Audible, Kindle, Goodreads e Spotify, mantendo excelente performance, segurança, escalabilidade e usabilidade.
+
+PLATAFORMA COLABORATIVA E AGREGADOR DE OBRAS
+
+A plataforma deve funcionar como um agregador de conteúdo criado e catalogado pela comunidade.
+
+O sistema não será responsável por adicionar manualmente livros, novels, web novels, fanfics, mangás ou outras obras.
+
+Toda a catalogação será realizada pelos próprios usuários.
+
+MODELO DE CONTRIBUIÇÃO COMUNITÁRIA
+
+Os usuários poderão:
+
+Adicionar novas obras
+Adicionar volumes
+Adicionar capítulos
+Adicionar capas
+Adicionar sinopses
+Adicionar gêneros
+Adicionar tags
+Corrigir informações incorretas
+Atualizar status da obra
+Reportar problemas
+
+O sistema deverá registrar quem realizou cada contribuição.
+
+RESPONSABILIDADE DO CONTEÚDO
+
+A plataforma atua apenas como intermediária tecnológica.
+
+Ela não é responsável pela criação ou envio das obras.
+
+Todo conteúdo disponibilizado será enviado pelos próprios usuários.
+
+Cada usuário será responsável pelo conteúdo que publicar.
+
+Ao realizar uploads ou cadastrar obras, o usuário deverá aceitar termos específicos declarando que:
+
+Possui autorização para publicar o conteúdo.
+É detentor dos direitos do conteúdo.
+Ou o conteúdo encontra-se em domínio público.
+Ou possui licença que permite compartilhamento.
+SISTEMA DE MODERAÇÃO
+
+Criar sistema completo de moderação.
+
+Permitir:
+
+Denúncia de obras
+Denúncia de capítulos
+Denúncia de usuários
+Solicitações de remoção
+Revisão manual
+Revisão automática por IA
+SISTEMA DE COPYRIGHT E DMCA
+
+Implementar processo semelhante ao utilizado por:
+
+YouTube
+Reddit
+GitHub
+Discord
+
+Permitir:
+
+Solicitação de remoção
+
+Titulares dos direitos poderão solicitar:
+
+Remoção de obras
+Remoção de capítulos
+Remoção de imagens
+Remoção de perfis infratores
+Canal oficial para denúncias
+
+Disponibilizar:
+
+Formulário de copyright
+E-mail dedicado
+Processo automatizado
+Sistema de strike
+
+Usuários que enviarem conteúdo protegido repetidamente receberão:
+
+Advertência
+Suspensão temporária
+Banimento permanente
+ESTRUTURA DE BIBLIOTECA COLABORATIVA
+
+A plataforma deve funcionar como uma grande biblioteca digital criada pela comunidade.
+
+Semelhante a:
+
+MyAnimeList
+Novel Updates
+Goodreads
+Wikipédia
+
+Os usuários constroem coletivamente o catálogo.
+
+SISTEMA DE CURADORIA DA COMUNIDADE
+
+Criar níveis de confiança.
+
+Exemplo:
+
+Usuário comum
+Pode sugerir alterações
+Contribuidor
+Pode adicionar obras
+Curador
+Pode aprovar alterações
+Moderador
+Pode remover conteúdo
+Administrador
+Controle total
+FILTROS E ORGANIZAÇÃO DA BIBLIOTECA
+
+Como o catálogo poderá crescer para milhões de obras, implementar filtros extremamente avançados.
+
+Permitir filtrar por:
+
+Dados básicos
+Gênero
+Subgênero
+Autor
+Artista
+Nacionalidade
+Idioma
+Ano
+Status
+Em andamento
+Completa
+Hiato
+Cancelada
+Popularidade
+Mais lidas
+Mais ouvidas
+Mais favoritados
+Mais avaliadas
+Tendências
+Comunidade
+Mais recomendadas
+Melhor avaliação
+Crescimento da semana
+Crescimento do mês
+Áudio
+Possui audiolivro
+Possui múltiplas vozes
+Possui narração premium
+OBJETIVO DA PLATAFORMA
+
+Transformar o sistema em uma gigantesca biblioteca colaborativa de leitura e audiolivros com IA, onde a comunidade é responsável pela construção e manutenção do catálogo, enquanto a plataforma fornece:
+
+Organização
+Descoberta de conteúdo
+Narração por IA
+Recursos sociais
+Gamificação
+Recomendação inteligente
+Segurança
+Escalabilidade
+Ferramentas de moderação
+
+minimizando a necessidade de gerenciamento manual do catálogo e reduzindo riscos operacionais relacionados à publicação centralizada de conteúdo.

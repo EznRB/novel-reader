@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, MessageSquare,
   Sparkles, X, Loader2, Settings2, Film, List,
+  Repeat, Users, Zap, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +76,7 @@ const THEME_BG: Record<ReaderTheme, string> = {
   light: "bg-white",
 };
 
-/* ── Summary panel ── */
+/* ── Enhanced Summary panel ── */
 function SummaryPanel({ bookId, chapterNumber, onClose }: {
   bookId: number; chapterNumber: number; onClose: () => void;
 }) {
@@ -95,23 +96,130 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">AI Summary</span>
+          <Badge variant="secondary" className="text-[10px]">Ch.{chapterNumber}</Badge>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
           <X className="w-3.5 h-3.5" />
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {isLoading ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-4">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generating summary…</span>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Generating summary…</span>
             </div>
-            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className={`h-3 ${i % 3 === 0 ? "w-3/4" : "w-full"}`} />)}
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className={`h-3 ${i % 3 === 0 ? "w-3/4" : "w-full"}`} />
+            ))}
           </div>
         ) : summary ? (
-          <p className="text-sm leading-relaxed text-foreground whitespace-pre-line" data-testid="text-summary">
-            {summary.summary}
-          </p>
+          <>
+            {/* Quick summary — highlighted card */}
+            {summary.quickSummary && (
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1.5">
+                  ⚡ Quick Summary
+                </p>
+                <p className="text-sm leading-relaxed text-foreground">
+                  {summary.quickSummary}
+                </p>
+              </div>
+            )}
+
+            {/* Characters present */}
+            {summary.charactersPresent && summary.charactersPresent.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Users className="w-3 h-3 text-blue-400" />
+                  <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">
+                    Characters in this chapter
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {summary.charactersPresent.map((name) => (
+                    <span
+                      key={name}
+                      className="text-xs bg-blue-950/60 text-blue-300 border border-blue-800/50 px-2 py-0.5 rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Key events */}
+            {summary.keyEvents && summary.keyEvents.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Key Events
+                </p>
+                <ul className="space-y-2">
+                  {summary.keyEvents.map((event, i) => (
+                    <li key={i} className="flex gap-2 text-xs text-foreground/90">
+                      <span className="text-primary mt-0.5 shrink-0">▸</span>
+                      <span>{event}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Revelations */}
+            {summary.revelations && summary.revelations.length > 0 && (
+              <div className="bg-yellow-950/30 border border-yellow-800/30 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Eye className="w-3 h-3 text-yellow-400" />
+                  <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wide">
+                    Revelations
+                  </p>
+                </div>
+                <ul className="space-y-1.5">
+                  {summary.revelations.map((r, i) => (
+                    <li key={i} className="flex gap-2 text-xs text-yellow-200/80">
+                      <span className="text-yellow-500 mt-0.5 shrink-0">!</span>
+                      <span>{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Power changes */}
+            {summary.powerChanges && summary.powerChanges.length > 0 && (
+              <div className="bg-blue-950/30 border border-blue-800/30 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Zap className="w-3 h-3 text-blue-400" />
+                  <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">
+                    Power Changes
+                  </p>
+                </div>
+                <ul className="space-y-1.5">
+                  {summary.powerChanges.map((p, i) => (
+                    <li key={i} className="flex gap-2 text-xs text-blue-200/80">
+                      <span className="text-blue-400 mt-0.5 shrink-0">↑</span>
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Full summary */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Full Summary
+              </p>
+              <p
+                className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line"
+                data-testid="text-summary"
+              >
+                {summary.summary}
+              </p>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">Could not generate summary.</p>
         )}
@@ -275,13 +383,14 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  // Persisted reader settings (survive page reload)
+  // Persisted reader settings
   const [fontSize, setFontSize] = useLocalStorage("reader-font-size", 18);
   const [lineHeight, setLineHeight] = useLocalStorage("reader-line-height", 1.9);
   const [theme, setTheme] = useLocalStorage<ReaderTheme>("reader-theme", "dark");
   const [font, setFont] = useLocalStorage<ReaderFont>("reader-font", "serif");
   const [voice, setVoice] = useLocalStorage("reader-voice", "en-US-AriaNeural");
   const [rate, setRate] = useLocalStorage("reader-rate", 0);
+  const [autoplayEnabled, setAutoplayEnabled] = useLocalStorage("reader-autoplay", false);
 
   // Ephemeral UI state
   const [showSummary, setShowSummary] = useState(false);
@@ -304,13 +413,11 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const { data: progress } = useGetReadingProgress(bookId, {
     query: { enabled: !!bookId, queryKey: getGetReadingProgressQueryKey(bookId) },
   });
-  // Only fetch chapter list when TOC is opened (lazy)
   const { data: allChapters } = useListChapters(bookId, {
     query: { enabled: !!bookId && showToc, queryKey: getListChaptersQueryKey(bookId) },
   });
   const updateProgress = useUpdateReadingProgress();
 
-  // useMemo keeps array reference stable so AudioPlayer doesn't reset on every render
   const sentences = useMemo(
     () => (chapter?.content ? splitSentences(chapter.content) : []),
     [chapter?.content],
@@ -340,12 +447,23 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
     controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
   }, []);
 
-  // Sentence ref for scroll-into-view
+  // Sentence scroll-into-view
   const sentenceRefs = useRef<(HTMLSpanElement | null)[]>([]);
   useEffect(() => {
     const el = sentenceRefs.current[currentSentence];
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentSentence]);
+
+  // Autoplay: go to next chapter when this one finishes
+  const goTo = useCallback((num: number) => {
+    setLocation(`/read/${bookId}/chapter/${num}`);
+  }, [bookId, setLocation]);
+
+  const handleChapterComplete = useCallback(() => {
+    if (autoplayEnabled && chapterNumber < totalChapters) {
+      goTo(chapterNumber + 1);
+    }
+  }, [autoplayEnabled, chapterNumber, totalChapters, goTo]);
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
@@ -363,12 +481,12 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       }
       if (e.key === "ArrowRight" && e.shiftKey) {
         e.preventDefault();
-        if (chapterNumber < totalChapters) setLocation(`/read/${bookId}/chapter/${chapterNumber + 1}`);
+        if (chapterNumber < totalChapters) goTo(chapterNumber + 1);
         return;
       }
       if (e.key === "ArrowLeft" && e.shiftKey) {
         e.preventDefault();
-        if (chapterNumber > 1) setLocation(`/read/${bookId}/chapter/${chapterNumber - 1}`);
+        if (chapterNumber > 1) goTo(chapterNumber - 1);
         return;
       }
       if (e.key === "ArrowRight") {
@@ -394,19 +512,20 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         setShowToc((v) => !v);
         return;
       }
+      if (e.key === "a" || e.key === "A") {
+        setAutoplayEnabled(!autoplayEnabled);
+        return;
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [chapterNumber, totalChapters, bookId, setLocation]);
-
-  const goTo = (num: number) => setLocation(`/read/${bookId}/chapter/${num}`);
+  }, [chapterNumber, totalChapters, goTo, autoplayEnabled, setAutoplayEnabled]);
 
   const bgClass = THEME_BG[theme];
   const themeClass = THEME_CLASSES[theme];
   const fontClass = font === "serif" ? "font-serif" : "font-sans";
   const dimInactive = cinematicMode && isAudioPlaying;
 
-  // Suppress unused variable warning — progress is fetched to warm the cache
   void progress;
 
   return (
@@ -467,6 +586,16 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 >
                   <Film className="w-4 h-4" />
                 </Button>
+                {/* Autoplay toggle */}
+                <Button
+                  variant="ghost" size="icon"
+                  className={`h-8 w-8 ${autoplayEnabled ? "text-green-400 bg-green-400/10" : ""}`}
+                  onClick={() => setAutoplayEnabled(!autoplayEnabled)}
+                  title={`Autoplay (A) — ${autoplayEnabled ? "ON" : "OFF"}`}
+                  data-testid="btn-autoplay"
+                >
+                  <Repeat className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="ghost" size="icon" className="h-8 w-8"
                   onClick={() => setShowSummary((v) => !v)}
@@ -497,11 +626,16 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               </div>
             </div>
 
-            {/* Keyboard shortcut hint */}
-            <div className="text-center pb-1">
+            {/* Keyboard hint + autoplay indicator */}
+            <div className="text-center pb-1 flex items-center justify-center gap-3">
               <span className="text-[10px] text-muted-foreground/50 font-mono">
-                Space: play/pause · ← →: sentence · Shift+← →: chapter · T: chapters · C: cinematic · Esc: close
+                Space: play/pause · ← →: sentence · Shift+← →: chapter · T: chapters · C: cinematic · A: autoplay · Esc: close
               </span>
+              {autoplayEnabled && (
+                <span className="text-[10px] text-green-400 font-medium flex items-center gap-1">
+                  <Repeat className="w-2.5 h-2.5" /> Autoplay ON
+                </span>
+              )}
             </div>
           </motion.header>
         )}
@@ -542,6 +676,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
           <div className="text-center mb-10">
             <Badge variant="outline" className="mb-3 text-xs font-mono border-border/60">
               {chapterNumber} / {totalChapters}
+              {autoplayEnabled && <span className="ml-2 text-green-400">▶▶</span>}
             </Badge>
             <h1
               className={`font-serif text-2xl font-semibold mb-1 ${
@@ -608,6 +743,12 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               >
                 <ChevronLeft className="w-4 h-4" /> Previous
               </Button>
+              {autoplayEnabled && chapterNumber < totalChapters && (
+                <span className="text-xs text-green-400 flex items-center gap-1.5">
+                  <Repeat className="w-3 h-3" />
+                  Auto-advances after playback
+                </span>
+              )}
               <Button
                 variant="outline"
                 onClick={() => goTo(chapterNumber + 1)}
@@ -641,6 +782,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
             disabled={chapterLoading || !chapter}
             immersive={cinematicMode}
             onPlayingChange={setIsAudioPlaying}
+            onChapterComplete={handleChapterComplete}
           />
         </div>
       </div>

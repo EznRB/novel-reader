@@ -94,6 +94,8 @@ export interface AudioPlayerProps {
   disabled?: boolean;
   immersive?: boolean;
   onPlayingChange?: (playing: boolean) => void;
+  /** Called when the last sentence of the chapter finishes playing */
+  onChapterComplete?: () => void;
 }
 
 /* ── Component ── */
@@ -110,21 +112,24 @@ export function AudioPlayer({
   disabled,
   immersive = false,
   onPlayingChange,
+  onChapterComplete,
 }: AudioPlayerProps) {
   const [status, setStatus]           = useState<PlayerStatus>("idle");
   const [currentStyle, setCurrentStyle] = useState<VoiceStyle>("narration");
 
   /* ── Stable refs for props (updated every render — no stale closures) ── */
-  const sentencesRef        = useRef(sentences);
-  const voiceRef            = useRef(voice);
-  const rateRef             = useRef(rate);
-  const immersiveRef        = useRef(immersive);
-  const onSentenceChangeRef = useRef(onSentenceChange);
-  sentencesRef.current        = sentences;
-  voiceRef.current            = voice;
-  rateRef.current             = rate;
-  immersiveRef.current        = immersive;
-  onSentenceChangeRef.current = onSentenceChange;
+  const sentencesRef           = useRef(sentences);
+  const voiceRef               = useRef(voice);
+  const rateRef                = useRef(rate);
+  const immersiveRef           = useRef(immersive);
+  const onSentenceChangeRef    = useRef(onSentenceChange);
+  const onChapterCompleteRef   = useRef(onChapterComplete);
+  sentencesRef.current           = sentences;
+  voiceRef.current               = voice;
+  rateRef.current                = rate;
+  immersiveRef.current           = immersive;
+  onSentenceChangeRef.current    = onSentenceChange;
+  onChapterCompleteRef.current   = onChapterComplete;
 
   /* ── Playback state refs ── */
   const audioRef         = useRef<HTMLAudioElement | null>(null);
@@ -160,6 +165,8 @@ export function AudioPlayer({
         playingIdxRef.current = -1;
         setStatus("idle");
         setCurrentStyle("narration");
+        // Notify parent that all sentences of this chapter finished
+        onChapterCompleteRef.current?.();
       }
     };
 

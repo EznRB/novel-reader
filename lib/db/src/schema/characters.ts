@@ -10,6 +10,8 @@ export const charactersTable = pgTable("characters", {
   description: text("description"),
   role: text("role"),
   firstAppearanceChapter: integer("first_appearance_chapter"),
+  gender: text("gender"),
+  assignedVoice: text("assigned_voice"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
