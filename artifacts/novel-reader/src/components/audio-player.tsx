@@ -35,13 +35,13 @@ type VoiceStyle =
   | "excited"  | "angry"   | "whisper" | "dialogue";
 
 const STYLE_LABELS: Record<VoiceStyle, string> = {
-  narration: "Narrating",
-  dialogue:  "Dialogue",
-  cheerful:  "Cheerful",
-  sad:       "Somber",
-  excited:   "Excited",
-  angry:     "Intense",
-  whisper:   "Hushed",
+  narration: "Narrando",
+  dialogue:  "Diálogo",
+  cheerful:  "Animado",
+  sad:       "Melancólico",
+  excited:   "Empolgado",
+  angry:     "Intenso",
+  whisper:   "Sussurro",
 };
 
 const STYLE_COLORS: Record<VoiceStyle, string> = {
@@ -54,18 +54,32 @@ const STYLE_COLORS: Record<VoiceStyle, string> = {
   whisper:   "text-violet-400",
 };
 
-/* ── Sentiment detection ── */
+/* ── Detecção de entonação (pt-BR + EN) ── */
 function detectStyle(text: string): VoiceStyle {
   const s = text.trim();
+
+  // Diálogo — aspas de qualquer tipo
   if (/[""\u201C\u201D\u2018\u2019'']/.test(s)) return "dialogue";
-  if (s.endsWith("?") && s.length < 90) return "dialogue";
+  if (s.endsWith("?") && s.length < 100) return "dialogue";
+
+  // Exclamação — distingue raiva de empolgação
   if (s.endsWith("!")) {
-    const angry = /\b(never|die|kill|destroy|fool|idiot|coward|traitor|damn|enough|how dare|impossible|you dare)\b/i;
+    const angry = /\b(nunca|morra|morra|mata|destrua|idiota|covarde|traidor|maldito|basta|como ousa|impossível|ouse|insolente|never|die|kill|destroy|fool|idiot|coward|traitor|damn|enough|how dare|impossible)\b/i;
     return angry.test(s) ? "angry" : "excited";
   }
-  if (/\b(died?|death|dead|lost|grief|tear|wept?|cried?|sorrow|pain|heartbreak|alone|lonely|miss|gone forever|helpless|hopeless|despair|mourn|suffer|agony|anguish)\b/i.test(s)) return "sad";
-  if (/\b(terrif|horror|fear|afraid|trembl|shiver|monster|demon|threaten|danger|flee|escape|alarm|shadow|darkness|chill|ghostly)\b/i.test(s)) return "angry";
-  if (/\b(attack|fight|battle|clash|rush|charge|explo|shatter|slash|pierce|struck|blood|wound|combat|crush|defeat|sword|punch|blade|burst|collide)\b/i.test(s)) return "excited";
+
+  // Tristeza / pesar
+  if (/\b(morr(eu|eu)|morte|mort(o|a)|perdi|perdeu|lágrima|chorou|chorava|dor|saudade|sozinho|sozinha|sofrimento|tristeza|desespero|angústia|pranto|lamentou|luto|lamentação|died?|death|dead|lost|grief|tear|wept?|cried?|sorrow|pain|heartbreak|alone|lonely|miss|gone forever|helpless|hopeless|despair|mourn|suffer|agony|anguish)\b/i.test(s)) return "sad";
+
+  // Terror / ameaça / sombra
+  if (/\b(terror|medo|assustou|tremeu|tremia|monstro|demônio|ameaça|perigo|fugiu|fuga|sombra|trevas|arrepio|espectro|fantasma|terrif|horror|fear|afraid|trembl|shiver|monster|demon|threaten|danger|flee|escape|alarm|shadow|darkness|chill|ghostly)\b/i.test(s)) return "angry";
+
+  // Combate / ação intensa
+  if (/\b(atacou|atacar|lutou|luta|batalha|combate|golpe|explosão|explodiu|sangue|ferido|ferimento|esmagou|cortou|perfurou|vitória|derrotou|rasgou|colidiu|attack|fight|battle|clash|rush|charge|explo|shatter|slash|pierce|struck|blood|wound|combat|crush|defeat|sword|punch|blade|burst|collide)\b/i.test(s)) return "excited";
+
+  // Sussurro / segredo
+  if (/\b(sussurrou|sussurrava|segredo|discretamente|sigiloso|baixinho|whisper|murmur|quietly|secret)\b/i.test(s)) return "whisper";
+
   return "narration";
 }
 
@@ -94,7 +108,7 @@ export interface AudioPlayerProps {
   disabled?: boolean;
   immersive?: boolean;
   onPlayingChange?: (playing: boolean) => void;
-  /** Called when the last sentence of the chapter finishes playing */
+  /** Chamado quando a última frase do capítulo termina de tocar */
   onChapterComplete?: () => void;
 }
 
@@ -165,7 +179,6 @@ export function AudioPlayer({
         playingIdxRef.current = -1;
         setStatus("idle");
         setCurrentStyle("narration");
-        // Notify parent that all sentences of this chapter finished
         onChapterCompleteRef.current?.();
       }
     };
@@ -186,7 +199,7 @@ export function AudioPlayer({
       revokeUrl(currentUrlRef.current);
       revokeUrl(prefetchUrlRef.current);
     };
-  }, []); // ← intentionally empty: Audio lives for the component lifetime
+  }, []); // ← empty: Audio lives for the component lifetime
 
   /* ── Fetch audio blob (stable — reads voice/rate from refs) ── */
   const fetchAudio = useCallback(async (text: string, style: string): Promise<string> => {
@@ -207,7 +220,7 @@ export function AudioPlayer({
     }
     const blob = await res.blob();
     return URL.createObjectURL(blob);
-  }, []); // stable — refs used inside
+  }, []); // stable
 
   /* ── Stop playback ── */
   const stopAudio = useCallback(() => {
@@ -226,7 +239,7 @@ export function AudioPlayer({
     setCurrentStyle("narration");
   }, []); // stable
 
-  /* ── Prefetch next sentence in background ── */
+  /* ── Prefetch next sentence ── */
   const prefetchNext = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
     if (idx >= sents.length || !sents[idx]?.trim()) return;
@@ -261,7 +274,6 @@ export function AudioPlayer({
     try {
       let url: string;
 
-      // Use prefetched blob if it matches
       if (
         prefetchIdxRef.current   === idx &&
         prefetchStyleRef.current === style &&
@@ -274,7 +286,6 @@ export function AudioPlayer({
         url = await fetchAudio(sents[idx], style);
       }
 
-      // Guard: user may have stopped while we were fetching
       if (!shouldPlayRef.current) {
         revokeUrl(url);
         setStatus("idle");
@@ -290,7 +301,6 @@ export function AudioPlayer({
       await audio.play();
       setStatus("playing");
 
-      // Kick off background prefetch for the sentence after this one
       prefetchNext(idx + 1);
 
     } catch (err) {
@@ -299,7 +309,7 @@ export function AudioPlayer({
     }
   }, [fetchAudio, stopAudio, prefetchNext]); // stable
 
-  /* ── Keep playSentenceRef in sync so onEnded always calls the latest ── */
+  /* ── Keep playSentenceRef in sync ── */
   useEffect(() => {
     playSentenceRef.current = playSentence;
   }, [playSentence]);
@@ -349,12 +359,13 @@ export function AudioPlayer({
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
 
-  const englishVoices = voices.filter((v) => v.Locale.startsWith("en-"));
-  const otherVoices   = voices.filter((v) => !v.Locale.startsWith("en-"));
+  // Prioriza vozes pt-BR, depois outros idiomas
+  const ptBRVoices  = voices.filter((v) => v.Locale.startsWith("pt-BR") || v.Locale.startsWith("pt-PT"));
+  const otherVoices = voices.filter((v) => !v.Locale.startsWith("pt-"));
 
   return (
     <div className="flex flex-col gap-3 w-full">
-      {/* Progress bar */}
+      {/* Barra de progresso */}
       <div className="flex items-center gap-3">
         <span className="text-xs font-mono text-muted-foreground w-16 shrink-0">
           {currentIdx + 1} / {sentences.length}
@@ -373,7 +384,7 @@ export function AudioPlayer({
         )}
       </div>
 
-      {/* Controls */}
+      {/* Controles */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Button
@@ -433,7 +444,7 @@ export function AudioPlayer({
           {isPlaying && <WaveformViz />}
         </div>
 
-        {/* Speed slider + voice selector */}
+        {/* Velocidade + seletor de voz */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2 min-w-[160px]">
             <Volume2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -455,15 +466,15 @@ export function AudioPlayer({
               onValueChange={(v) => { onVoiceChange(v); if (isPlaying) stopAudio(); }}
             >
               <SelectTrigger className="h-8 text-xs w-52 bg-secondary border-border" data-testid="select-voice">
-                <SelectValue placeholder="Select voice" />
+                <SelectValue placeholder="Selecionar voz" />
               </SelectTrigger>
               <SelectContent className="max-h-64">
-                {englishVoices.length > 0 && (
+                {ptBRVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1 text-xs text-muted-foreground font-semibold uppercase tracking-wide">
-                      English
+                      Português (Brasil)
                     </div>
-                    {englishVoices.slice(0, 30).map((v) => (
+                    {ptBRVoices.slice(0, 20).map((v) => (
                       <SelectItem key={v.ShortName} value={v.ShortName} className="text-xs">
                         {v.FriendlyName}
                       </SelectItem>
@@ -473,7 +484,7 @@ export function AudioPlayer({
                 {otherVoices.length > 0 && (
                   <>
                     <div className="px-2 py-1 text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-1">
-                      Other Languages
+                      Outros Idiomas
                     </div>
                     {otherVoices.slice(0, 20).map((v) => (
                       <SelectItem key={v.ShortName} value={v.ShortName} className="text-xs">
@@ -488,7 +499,7 @@ export function AudioPlayer({
 
           {voicesLoading && (
             <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin" /> Loading voices…
+              <Loader2 className="w-3 h-3 animate-spin" /> Carregando vozes…
             </span>
           )}
         </div>
@@ -496,7 +507,7 @@ export function AudioPlayer({
 
       {status === "error" && (
         <p className="text-xs text-destructive">
-          Audio error — check your connection and try again.
+          Erro de áudio — verifique sua conexão e tente novamente.
         </p>
       )}
     </div>

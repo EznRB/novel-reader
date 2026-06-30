@@ -76,7 +76,7 @@ const THEME_BG: Record<ReaderTheme, string> = {
   light: "bg-white",
 };
 
-/* ── Enhanced Summary panel ── */
+/* ── Painel de Resumo aprimorado ── */
 function SummaryPanel({ bookId, chapterNumber, onClose }: {
   bookId: number; chapterNumber: number; onClose: () => void;
 }) {
@@ -95,8 +95,8 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
       <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">AI Summary</span>
-          <Badge variant="secondary" className="text-[10px]">Ch.{chapterNumber}</Badge>
+          <span className="font-semibold text-sm">Resumo IA</span>
+          <Badge variant="secondary" className="text-[10px]">Cap.{chapterNumber}</Badge>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
           <X className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-4">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Generating summary…</span>
+              <span>Gerando resumo…</span>
             </div>
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className={`h-3 ${i % 3 === 0 ? "w-3/4" : "w-full"}`} />
@@ -116,11 +116,11 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
           </div>
         ) : summary ? (
           <>
-            {/* Quick summary — highlighted card */}
+            {/* Resumo rápido — card destacado */}
             {summary.quickSummary && (
               <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
                 <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1.5">
-                  ⚡ Quick Summary
+                  ⚡ Resumo Rápido
                 </p>
                 <p className="text-sm leading-relaxed text-foreground">
                   {summary.quickSummary}
@@ -128,13 +128,13 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Characters present */}
+            {/* Personagens presentes */}
             {summary.charactersPresent && summary.charactersPresent.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Users className="w-3 h-3 text-blue-400" />
                   <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">
-                    Characters in this chapter
+                    Personagens neste capítulo
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -150,11 +150,11 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Key events */}
+            {/* Eventos principais */}
             {summary.keyEvents && summary.keyEvents.length > 0 && (
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Key Events
+                  Eventos Principais
                 </p>
                 <ul className="space-y-2">
                   {summary.keyEvents.map((event, i) => (
@@ -167,13 +167,13 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Revelations */}
+            {/* Revelações */}
             {summary.revelations && summary.revelations.length > 0 && (
               <div className="bg-yellow-950/30 border border-yellow-800/30 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Eye className="w-3 h-3 text-yellow-400" />
                   <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wide">
-                    Revelations
+                    Revelações
                   </p>
                 </div>
                 <ul className="space-y-1.5">
@@ -187,13 +187,13 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Power changes */}
+            {/* Mudanças de poder */}
             {summary.powerChanges && summary.powerChanges.length > 0 && (
               <div className="bg-blue-950/30 border border-blue-800/30 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Zap className="w-3 h-3 text-blue-400" />
                   <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">
-                    Power Changes
+                    Mudanças de Poder
                   </p>
                 </div>
                 <ul className="space-y-1.5">
@@ -207,10 +207,10 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Full summary */}
+            {/* Resumo completo */}
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                Full Summary
+                Resumo Completo
               </p>
               <p
                 className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line"
@@ -221,14 +221,14 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
             </div>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">Could not generate summary.</p>
+          <p className="text-sm text-muted-foreground">Não foi possível gerar o resumo.</p>
         )}
       </div>
     </motion.div>
   );
 }
 
-/* ── TOC panel ── */
+/* ── Painel de Índice (TOC) ── */
 function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
   chapters: Array<{ id: number; chapterNumber: number; title?: string | null; wordCount: number }>;
   currentChapter: number;
@@ -253,7 +253,7 @@ function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
       <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <List className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">Chapters</span>
+          <span className="font-semibold text-sm">Capítulos</span>
           <Badge variant="secondary" className="text-xs ml-1">{chapters.length}</Badge>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
@@ -278,12 +278,12 @@ function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
               </span>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm truncate ${isActive ? "text-primary font-medium" : isRead ? "text-muted-foreground" : "text-foreground"}`}>
-                  {ch.title ?? `Chapter ${ch.chapterNumber}`}
+                  {ch.title ?? `Capítulo ${ch.chapterNumber}`}
                 </p>
                 <p className="text-xs text-muted-foreground/70 mt-0.5">
                   {readingTime(ch.wordCount)}
                   {isRead && !isActive && <span className="text-green-500 ml-2">✓</span>}
-                  {isActive && <span className="text-primary ml-2">● now</span>}
+                  {isActive && <span className="text-primary ml-2">● atual</span>}
                 </p>
               </div>
             </button>
@@ -294,7 +294,7 @@ function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
   );
 }
 
-/* ── Reading settings popover ── */
+/* ── Configurações do leitor ── */
 function ReaderSettings({
   fontSize, onFontSize, lineHeight, onLineHeight,
   theme, onTheme, font, onFont,
@@ -307,7 +307,7 @@ function ReaderSettings({
   return (
     <div className="space-y-4 w-64 p-1">
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Font size</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Tamanho da fonte</p>
         <div className="flex items-center gap-3">
           <span className="text-xs font-serif">A</span>
           <Slider value={[fontSize]} min={14} max={26} step={1} onValueChange={([v]) => onFontSize(v)} className="flex-1" />
@@ -315,14 +315,14 @@ function ReaderSettings({
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Line spacing</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Espaçamento</p>
         <div className="flex items-center gap-3">
           <Slider value={[lineHeight]} min={1.4} max={2.4} step={0.1} onValueChange={([v]) => onLineHeight(v)} className="flex-1" />
           <span className="text-xs text-muted-foreground w-8">{lineHeight.toFixed(1)}</span>
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Font</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Fonte</p>
         <div className="flex gap-2">
           {(["serif", "sans"] as ReaderFont[]).map((f) => (
             <button
@@ -338,12 +338,12 @@ function ReaderSettings({
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Background</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Fundo</p>
         <div className="flex gap-2">
           {([
-            { key: "dark",  label: "Dark",  bg: "bg-[#0f1117]", text: "text-white"      },
-            { key: "sepia", label: "Sepia", bg: "bg-[#f5ead0]", text: "text-amber-900"  },
-            { key: "light", label: "Light", bg: "bg-white",     text: "text-gray-900"   },
+            { key: "dark",  label: "Escuro", bg: "bg-[#0f1117]", text: "text-white"      },
+            { key: "sepia", label: "Sépia",  bg: "bg-[#f5ead0]", text: "text-amber-900"  },
+            { key: "light", label: "Claro",  bg: "bg-white",     text: "text-gray-900"   },
           ] as const).map(({ key, label, bg, text }) => (
             <button
               key={key}
@@ -361,7 +361,7 @@ function ReaderSettings({
   );
 }
 
-/* ── Voice fetch hook ── */
+/* ── Hook de busca de vozes ── */
 function useVoices() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -376,23 +376,23 @@ function useVoices() {
   return { voices, loading };
 }
 
-/* ── Main reader ── */
+/* ── Leitor principal ── */
 export default function ReaderPage({ params }: { params: { id: string; num: string } }) {
   const bookId = parseInt(params.id, 10);
   const chapterNumber = parseInt(params.num, 10);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  // Persisted reader settings
+  // Configurações persistidas
   const [fontSize, setFontSize] = useLocalStorage("reader-font-size", 18);
   const [lineHeight, setLineHeight] = useLocalStorage("reader-line-height", 1.9);
   const [theme, setTheme] = useLocalStorage<ReaderTheme>("reader-theme", "dark");
   const [font, setFont] = useLocalStorage<ReaderFont>("reader-font", "serif");
-  const [voice, setVoice] = useLocalStorage("reader-voice", "en-US-AriaNeural");
+  const [voice, setVoice] = useLocalStorage("reader-voice", "pt-BR-FranciscaNeural");
   const [rate, setRate] = useLocalStorage("reader-rate", 0);
   const [autoplayEnabled, setAutoplayEnabled] = useLocalStorage("reader-autoplay", false);
 
-  // Ephemeral UI state
+  // Estado efêmero de UI
   const [showSummary, setShowSummary] = useState(false);
   const [showToc, setShowToc] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -400,7 +400,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // TTS state
+  // Estado do TTS
   const [currentSentence, setCurrentSentence] = useState(0);
   const { voices, loading: voicesLoading } = useVoices();
 
@@ -424,12 +424,12 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   );
   const totalChapters = book?.totalChapters ?? 0;
 
-  // Reset sentence index on chapter change
+  // Reset do índice de frase ao trocar de capítulo
   useEffect(() => {
     setCurrentSentence(0);
   }, [chapterNumber]);
 
-  // Save progress on chapter visit
+  // Salva progresso ao visitar capítulo
   useEffect(() => {
     if (bookId && chapterNumber) {
       updateProgress.mutate(
@@ -440,21 +440,21 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterNumber, bookId]);
 
-  // Auto-hide controls
+  // Auto-ocultar controles
   const showControlsTemp = useCallback(() => {
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
     controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
   }, []);
 
-  // Sentence scroll-into-view
+  // Scroll da frase atual para a view
   const sentenceRefs = useRef<(HTMLSpanElement | null)[]>([]);
   useEffect(() => {
     const el = sentenceRefs.current[currentSentence];
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentSentence]);
 
-  // Autoplay: go to next chapter when this one finishes
+  // Autoplay: vai ao próximo capítulo ao terminar o atual
   const goTo = useCallback((num: number) => {
     setLocation(`/read/${bookId}/chapter/${num}`);
   }, [bookId, setLocation]);
@@ -465,7 +465,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
     }
   }, [autoplayEnabled, chapterNumber, totalChapters, goTo]);
 
-  // ── Keyboard shortcuts ──
+  // ── Atalhos de teclado ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -534,7 +534,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       onMouseMove={showControlsTemp}
       onTouchStart={showControlsTemp}
     >
-      {/* Cinematic vignette overlay */}
+      {/* Vinheta cinemática */}
       {dimInactive && (
         <div
           className="pointer-events-none fixed inset-0 z-10"
@@ -542,7 +542,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         />
       )}
 
-      {/* Top bar */}
+      {/* Barra superior */}
       <AnimatePresence>
         {showControls && (
           <motion.header
@@ -563,7 +563,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
               <div className="flex-1 min-w-0 text-center">
                 <p className="text-xs text-muted-foreground truncate">{book?.title}</p>
                 <p className="text-sm font-medium text-foreground truncate">
-                  {chapter?.title ?? `Chapter ${chapterNumber}`}
+                  {chapter?.title ?? `Capítulo ${chapterNumber}`}
                 </p>
               </div>
 
@@ -572,7 +572,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                   variant="ghost" size="icon"
                   className={`h-8 w-8 ${showToc ? "text-primary bg-primary/10" : ""}`}
                   onClick={() => setShowToc((v) => !v)}
-                  title="Table of Contents (T)"
+                  title="Índice (T)"
                   data-testid="btn-toc"
                 >
                   <List className="w-4 h-4" />
@@ -581,40 +581,27 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                   variant="ghost" size="icon"
                   className={`h-8 w-8 ${cinematicMode ? "text-primary bg-primary/10" : ""}`}
                   onClick={() => setCinematicMode((v) => !v)}
-                  title="Cinematic mode (C)"
+                  title="Modo Cinemático (C)"
                   data-testid="btn-cinematic"
                 >
                   <Film className="w-4 h-4" />
                 </Button>
-                {/* Autoplay toggle */}
                 <Button
                   variant="ghost" size="icon"
-                  className={`h-8 w-8 ${autoplayEnabled ? "text-green-400 bg-green-400/10" : ""}`}
+                  className={`h-8 w-8 ${autoplayEnabled ? "text-primary bg-primary/10" : ""}`}
                   onClick={() => setAutoplayEnabled(!autoplayEnabled)}
-                  title={`Autoplay (A) — ${autoplayEnabled ? "ON" : "OFF"}`}
+                  title={autoplayEnabled ? "Autoplay ativado (A)" : "Autoplay desativado (A)"}
                   data-testid="btn-autoplay"
                 >
                   <Repeat className="w-4 h-4" />
                 </Button>
-                <Button
-                  variant="ghost" size="icon" className="h-8 w-8"
-                  onClick={() => setShowSummary((v) => !v)}
-                  data-testid="btn-summary"
-                >
-                  <Sparkles className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                  <Link href={`/book/${bookId}/ask`} data-testid="btn-ask">
-                    <MessageSquare className="w-4 h-4" />
-                  </Link>
-                </Button>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="btn-settings">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Configurações" data-testid="btn-settings">
                       <Settings2 className="w-4 h-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto" align="end">
+                  <PopoverContent align="end" className="w-auto p-3">
                     <ReaderSettings
                       fontSize={fontSize} onFontSize={setFontSize}
                       lineHeight={lineHeight} onLineHeight={setLineHeight}
@@ -623,171 +610,164 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                     />
                   </PopoverContent>
                 </Popover>
+                <Button
+                  variant="ghost" size="icon"
+                  className={`h-8 w-8 ${showSummary ? "text-primary bg-primary/10" : ""}`}
+                  onClick={() => setShowSummary((v) => !v)}
+                  title="Resumo IA"
+                  data-testid="btn-summary"
+                >
+                  <Sparkles className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="Perguntar à IA">
+                  <Link href={`/book/${bookId}/ask`}>
+                    <MessageSquare className="w-4 h-4" />
+                  </Link>
+                </Button>
               </div>
             </div>
 
-            {/* Keyboard hint + autoplay indicator */}
-            <div className="text-center pb-1 flex items-center justify-center gap-3">
-              <span className="text-[10px] text-muted-foreground/50 font-mono">
-                Space: play/pause · ← →: sentence · Shift+← →: chapter · T: chapters · C: cinematic · A: autoplay · Esc: close
-              </span>
-              {autoplayEnabled && (
-                <span className="text-[10px] text-green-400 font-medium flex items-center gap-1">
-                  <Repeat className="w-2.5 h-2.5" /> Autoplay ON
-                </span>
-              )}
+            {/* Barra de atalhos */}
+            <div className="max-w-3xl mx-auto px-4 pb-2">
+              <p className="text-[10px] text-muted-foreground/50 text-center">
+                Espaço: play/pause · ←/→: frase · Shift+←/→: capítulo · T: índice · C: cinemático · A: autoplay · Esc: fechar
+              </p>
             </div>
           </motion.header>
         )}
       </AnimatePresence>
 
-      {/* Chapter navigation arrows */}
+      {/* Navegação lateral — capítulo anterior */}
       <AnimatePresence>
-        {showControls && (
-          <>
-            {chapterNumber > 1 && (
-              <motion.button
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={() => goTo(chapterNumber - 1)}
-                className="fixed left-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-card/80 border border-border backdrop-blur-sm hover:bg-card hover:border-primary/50 transition-all"
-                data-testid="btn-prev-chapter"
-              >
-                <ChevronLeft className="w-5 h-5 text-foreground" />
-              </motion.button>
-            )}
-            {chapterNumber < totalChapters && (
-              <motion.button
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={() => goTo(chapterNumber + 1)}
-                className="fixed right-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-card/80 border border-border backdrop-blur-sm hover:bg-card hover:border-primary/50 transition-all"
-                data-testid="btn-next-chapter"
-              >
-                <ChevronRight className="w-5 h-5 text-foreground" />
-              </motion.button>
-            )}
-          </>
+        {showControls && chapterNumber > 1 && (
+          <motion.button
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            onClick={() => goTo(chapterNumber - 1)}
+            className="fixed left-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-card/80 border border-border backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-all"
+            title="Capítulo anterior (Shift+←)"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Reading content */}
-      <div className="pt-24 pb-56 px-4">
-        <div className="max-w-2xl mx-auto">
-          {/* Chapter header */}
-          <div className="text-center mb-10">
-            <Badge variant="outline" className="mb-3 text-xs font-mono border-border/60">
-              {chapterNumber} / {totalChapters}
-              {autoplayEnabled && <span className="ml-2 text-green-400">▶▶</span>}
-            </Badge>
-            <h1
-              className={`font-serif text-2xl font-semibold mb-1 ${
-                theme === "dark" ? "text-white/90" : theme === "sepia" ? "text-amber-950" : "text-gray-900"
-              }`}
-            >
-              {chapter?.title ?? `Chapter ${chapterNumber}`}
-            </h1>
-            {chapter && (
-              <p className="text-xs text-muted-foreground font-mono">
-                {chapter.wordCount.toLocaleString()} words · {readingTime(chapter.wordCount)}
-              </p>
-            )}
-          </div>
+      {/* Navegação lateral — próximo capítulo */}
+      <AnimatePresence>
+        {showControls && chapterNumber < totalChapters && (
+          <motion.button
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            onClick={() => goTo(chapterNumber + 1)}
+            className="fixed right-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-card/80 border border-border backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-all"
+            title="Próximo capítulo (Shift+→)"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
-          {/* Text */}
-          {chapterLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Skeleton key={i} className={`h-4 ${i % 5 === 4 ? "w-2/3" : "w-full"} bg-white/5`} />
-              ))}
-            </div>
-          ) : chapter ? (
+      {/* Conteúdo principal */}
+      <div className="max-w-3xl mx-auto px-6 pt-28 pb-48">
+        {/* Contador de capítulo */}
+        <div className="text-center mb-8">
+          <span className="text-xs font-mono text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+            {chapterNumber} / {totalChapters}
+          </span>
+        </div>
+
+        {chapterLoading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className={`h-4 ${i % 5 === 4 ? "w-2/3" : "w-full"}`} />
+            ))}
+          </div>
+        ) : chapter ? (
+          <>
+            <h1 className={`text-2xl font-bold text-foreground mb-2 text-center ${fontClass}`}>
+              {chapter.title ?? `Capítulo ${chapterNumber}`}
+            </h1>
+            <p className="text-center text-xs text-muted-foreground mb-10">
+              {chapter.wordCount.toLocaleString("pt-BR")} palavras · {readingTime(chapter.wordCount)}
+            </p>
+
             <div
-              className={`prose-reader ${fontClass}`}
-              style={{
-                fontSize: `${fontSize}px`,
-                lineHeight,
-                color: theme === "dark" ? "hsl(215 15% 85%)" : theme === "sepia" ? "#3d2b1f" : "#111827",
-              }}
+              className={`leading-relaxed ${fontClass}`}
+              style={{ fontSize: `${fontSize}px`, lineHeight }}
             >
               {sentences.map((sentence, idx) => {
                 const isActive = idx === currentSentence;
+                const isPast = idx < currentSentence;
                 return (
                   <span
                     key={idx}
                     ref={(el) => { sentenceRefs.current[idx] = el; }}
-                    data-testid={`sentence-${idx}`}
-                    className={`transition-all duration-300 ${
-                      isActive ? "sentence-active" : dimInactive ? "opacity-25" : ""
-                    }`}
-                    style={{
-                      cursor: "pointer",
-                      ...(isActive && cinematicMode ? { textShadow: "0 0 20px rgba(var(--primary), 0.4)" } : {}),
-                    }}
                     onClick={() => setCurrentSentence(idx)}
+                    className={`cursor-pointer transition-all duration-200 ${
+                      isActive
+                        ? "text-foreground bg-primary/15 rounded px-0.5"
+                        : isPast
+                        ? dimInactive ? "opacity-20 text-muted-foreground" : "text-muted-foreground"
+                        : dimInactive ? "opacity-30" : "text-foreground/90"
+                    } hover:text-foreground`}
                   >
                     {sentence}{" "}
                   </span>
                 );
               })}
             </div>
-          ) : null}
+          </>
+        ) : (
+          <p className="text-center text-muted-foreground">Capítulo não encontrado.</p>
+        )}
+      </div>
 
-          {/* Chapter nav (bottom) */}
-          {!chapterLoading && chapter && (
-            <div className="flex items-center justify-between mt-12 pt-8 border-t border-border/30">
-              <Button
-                variant="outline"
-                onClick={() => goTo(chapterNumber - 1)}
-                disabled={chapterNumber <= 1}
-                className="gap-2"
-                data-testid="btn-prev-chapter-bottom"
-              >
-                <ChevronLeft className="w-4 h-4" /> Previous
-              </Button>
-              {autoplayEnabled && chapterNumber < totalChapters && (
-                <span className="text-xs text-green-400 flex items-center gap-1.5">
-                  <Repeat className="w-3 h-3" />
-                  Auto-advances after playback
-                </span>
-              )}
-              <Button
-                variant="outline"
-                onClick={() => goTo(chapterNumber + 1)}
-                disabled={chapterNumber >= totalChapters}
-                className="gap-2"
-                data-testid="btn-next-chapter-bottom"
-              >
-                Next <ChevronRight className="w-4 h-4" />
-              </Button>
+      {/* Player de áudio fixo na base */}
+      <AnimatePresence>
+        {showControls && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 px-4 py-4"
+            style={{ background: "rgba(15,17,23,0.96)", backdropFilter: "blur(12px)" }}
+          >
+            <div className="max-w-3xl mx-auto">
+              <AudioPlayer
+                sentences={sentences}
+                currentIdx={currentSentence}
+                onSentenceChange={setCurrentSentence}
+                voice={voice}
+                rate={rate}
+                onVoiceChange={setVoice}
+                onRateChange={setRate}
+                voices={voices}
+                voicesLoading={voicesLoading}
+                disabled={chapterLoading || !chapter}
+                immersive={cinematicMode}
+                onPlayingChange={setIsAudioPlaying}
+                onChapterComplete={handleChapterComplete}
+              />
             </div>
-          )}
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Audio Player Bar */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 px-4 py-3"
-        style={{ background: "rgba(15,17,23,0.95)", backdropFilter: "blur(16px)" }}
-      >
-        <div className="max-w-3xl mx-auto">
-          <AudioPlayer
-            sentences={sentences}
-            currentIdx={currentSentence}
-            onSentenceChange={setCurrentSentence}
-            voice={voice}
-            rate={rate}
-            onVoiceChange={setVoice}
-            onRateChange={setRate}
-            voices={voices}
-            voicesLoading={voicesLoading}
-            disabled={chapterLoading || !chapter}
-            immersive={cinematicMode}
-            onPlayingChange={setIsAudioPlaying}
-            onChapterComplete={handleChapterComplete}
+      {/* Painel de Resumo */}
+      <AnimatePresence>
+        {showSummary && (
+          <SummaryPanel
+            bookId={bookId}
+            chapterNumber={chapterNumber}
+            onClose={() => setShowSummary(false)}
           />
-        </div>
-      </div>
+        )}
+      </AnimatePresence>
 
-      {/* TOC panel */}
+      {/* Painel de Índice (TOC) */}
       <AnimatePresence>
         {showToc && allChapters && (
           <TocPanel
@@ -795,17 +775,6 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
             currentChapter={chapterNumber}
             onClose={() => setShowToc(false)}
             onNavigate={goTo}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Summary panel */}
-      <AnimatePresence>
-        {showSummary && (
-          <SummaryPanel
-            bookId={bookId}
-            chapterNumber={chapterNumber}
-            onClose={() => setShowSummary(false)}
           />
         )}
       </AnimatePresence>

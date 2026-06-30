@@ -4,25 +4,28 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// Style → prosody adjustments (rate delta %, pitch Hz, optional volume %)
+// Voz padrão do narrador (pt-BR, masculino, clara e neutra)
+export const NARRATOR_VOICE = "pt-BR-AntonioNeural";
+
+// Style → prosody adjustments optimizados para pt-BR
 const STYLE_PROSODY: Record<string, { rateDelta: number; pitch: string; volume?: string }> = {
   narration:  { rateDelta: 0,   pitch: "+0Hz" },
-  dialogue:   { rateDelta: 5,   pitch: "+2Hz" },
-  cheerful:   { rateDelta: 10,  pitch: "+6Hz",  volume: "+10%" },
-  sad:        { rateDelta: -20, pitch: "-6Hz",  volume: "-5%"  },
-  excited:    { rateDelta: 18,  pitch: "+10Hz", volume: "+15%" },
-  angry:      { rateDelta: 8,   pitch: "-8Hz",  volume: "+10%" },
-  whisper:    { rateDelta: -25, pitch: "-3Hz",  volume: "-10%" },
+  dialogue:   { rateDelta: 8,   pitch: "+3Hz" },
+  cheerful:   { rateDelta: 12,  pitch: "+8Hz",  volume: "+10%" },
+  sad:        { rateDelta: -18, pitch: "-5Hz",  volume: "-5%"  },
+  excited:    { rateDelta: 20,  pitch: "+12Hz", volume: "+15%" },
+  angry:      { rateDelta: 10,  pitch: "-6Hz",  volume: "+12%" },
+  whisper:    { rateDelta: -28, pitch: "-4Hz",  volume: "-12%" },
 };
 
 // NVIDIA available voices (Magpie TTS Multilingual)
 const NVIDIA_VOICES = [
-  { id: "male_1",   label: "Male — Confident",     gender: "male"   },
-  { id: "male_2",   label: "Male — Deep",           gender: "male"   },
-  { id: "male_3",   label: "Male — Young",          gender: "male"   },
-  { id: "female_1", label: "Female — Clear",        gender: "female" },
-  { id: "female_2", label: "Female — Soft",         gender: "female" },
-  { id: "female_3", label: "Female — Expressive",   gender: "female" },
+  { id: "male_1",   label: "Masculino — Confiante",  gender: "male"   },
+  { id: "male_2",   label: "Masculino — Grave",       gender: "male"   },
+  { id: "male_3",   label: "Masculino — Jovem",       gender: "male"   },
+  { id: "female_1", label: "Feminino — Clara",        gender: "female" },
+  { id: "female_2", label: "Feminino — Suave",        gender: "female" },
+  { id: "female_3", label: "Feminino — Expressiva",   gender: "female" },
 ];
 
 // GET /tts/voices  (msedge voices)
@@ -33,7 +36,7 @@ router.get("/tts/voices", async (_req, res): Promise<void> => {
     res.json(voices);
   } catch (err) {
     logger.error({ err }, "Failed to fetch TTS voices");
-    res.status(500).json({ error: "Failed to fetch voices" });
+    res.status(500).json({ error: "Falha ao buscar vozes" });
   }
 });
 
@@ -42,11 +45,11 @@ router.get("/tts/nvidia-voices", (_req, res): void => {
   res.json(NVIDIA_VOICES);
 });
 
-// POST /tts/synthesize  (msedge-tts — existing endpoint)
+// POST /tts/synthesize  (msedge-tts)
 router.post("/tts/synthesize", async (req, res): Promise<void> => {
   const {
     text,
-    voice = "en-US-AriaNeural",
+    voice = NARRATOR_VOICE,
     rate = 0,
     style = "narration",
   } = req.body as {
@@ -57,12 +60,12 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
   };
 
   if (!text || typeof text !== "string" || text.trim().length === 0) {
-    res.status(400).json({ error: "text is required" });
+    res.status(400).json({ error: "text é obrigatório" });
     return;
   }
 
   if (text.length > 5000) {
-    res.status(400).json({ error: "text must be 5000 characters or less" });
+    res.status(400).json({ error: "text deve ter no máximo 5000 caracteres" });
     return;
   }
 
@@ -91,17 +94,17 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
     audioStream.pipe(res);
   } catch (err) {
     logger.error({ err }, "TTS synthesis failed");
-    if (!res.headersSent) res.status(500).json({ error: "TTS synthesis failed" });
+    if (!res.headersSent) res.status(500).json({ error: "Falha na síntese de voz" });
   }
 });
 
-// POST /tts/nvidia-synthesize  (NVIDIA NIM TTS — high quality)
+// POST /tts/nvidia-synthesize  (NVIDIA NIM TTS — alta qualidade)
 router.post("/tts/nvidia-synthesize", async (req, res): Promise<void> => {
   const {
     text,
     voice = "male_1",
     speed = 1.0,
-    language = "en-US",
+    language = "pt-BR",
   } = req.body as {
     text?: string;
     voice?: string;
@@ -110,19 +113,19 @@ router.post("/tts/nvidia-synthesize", async (req, res): Promise<void> => {
   };
 
   if (!text || typeof text !== "string" || text.trim().length === 0) {
-    res.status(400).json({ error: "text is required" });
+    res.status(400).json({ error: "text é obrigatório" });
     return;
   }
 
   if (text.length > 5000) {
-    res.status(400).json({ error: "text must be 5000 characters or less" });
+    res.status(400).json({ error: "text deve ter no máximo 5000 caracteres" });
     return;
   }
 
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) {
-    logger.warn("NVIDIA_API_KEY not set — NVIDIA TTS unavailable");
-    res.status(503).json({ error: "NVIDIA TTS not configured" });
+    logger.warn("NVIDIA_API_KEY não configurado — NVIDIA TTS indisponível");
+    res.status(503).json({ error: "NVIDIA TTS não configurado" });
     return;
   }
 
@@ -147,7 +150,7 @@ router.post("/tts/nvidia-synthesize", async (req, res): Promise<void> => {
     if (!response.ok) {
       const errText = await response.text();
       logger.error({ status: response.status, body: errText }, "NVIDIA TTS API error");
-      res.status(502).json({ error: `NVIDIA TTS failed: ${response.status}` });
+      res.status(502).json({ error: `Falha NVIDIA TTS: ${response.status}` });
       return;
     }
 
@@ -159,7 +162,7 @@ router.post("/tts/nvidia-synthesize", async (req, res): Promise<void> => {
     res.end(buffer);
   } catch (err) {
     logger.error({ err }, "NVIDIA TTS synthesis failed");
-    if (!res.headersSent) res.status(500).json({ error: "NVIDIA TTS synthesis failed" });
+    if (!res.headersSent) res.status(500).json({ error: "Falha na síntese NVIDIA TTS" });
   }
 });
 

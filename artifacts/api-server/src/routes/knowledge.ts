@@ -10,13 +10,13 @@ const router: IRouter = Router();
 router.get("/books/:id/knowledge", async (req, res): Promise<void> => {
   const bookId = parseInt(req.params.id, 10);
   if (isNaN(bookId)) {
-    res.status(400).json({ error: "Invalid book ID" });
+    res.status(400).json({ error: "ID de livro inválido" });
     return;
   }
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, bookId));
   if (!book) {
-    res.status(404).json({ error: "Book not found" });
+    res.status(404).json({ error: "Livro não encontrado" });
     return;
   }
 
@@ -33,13 +33,13 @@ router.get("/books/:id/knowledge", async (req, res): Promise<void> => {
 router.post("/books/:id/knowledge/extract", async (req, res): Promise<void> => {
   const bookId = parseInt(req.params.id, 10);
   if (isNaN(bookId)) {
-    res.status(400).json({ error: "Invalid book ID" });
+    res.status(400).json({ error: "ID de livro inválido" });
     return;
   }
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, bookId));
   if (!book) {
-    res.status(404).json({ error: "Book not found" });
+    res.status(404).json({ error: "Livro não encontrado" });
     return;
   }
 
@@ -56,30 +56,45 @@ router.post("/books/:id/knowledge/extract", async (req, res): Promise<void> => {
     .where(and(eq(chaptersTable.bookId, bookId), lte(chaptersTable.chapterNumber, upToChapter)))
     .orderBy(chaptersTable.chapterNumber);
 
+  // Estratégia de orçamento por capítulo para máxima precisão:
+  // - Capítulos 1-25 (introdução da maioria das entidades): 700 chars
+  // - Capítulos 26-50: 350 chars
+  // Total: ~25k chars com marcadores claros
+  const MAX_TOTAL = Math.min(upToChapter, 50);
   const combinedText = chapters
-    .map((c) => `=== ${c.title ?? `Chapter ${c.chapterNumber}`} ===\n${c.content.slice(0, 2000)}`)
-    .join("\n\n")
-    .slice(0, 20000);
+    .filter((c) => c.chapterNumber <= MAX_TOTAL)
+    .map((c) => {
+      const budget = c.chapterNumber <= 25 ? 700 : 350;
+      const label = c.title ? `${c.title}` : `Capítulo ${c.chapterNumber}`;
+      return `[CAPÍTULO ${c.chapterNumber} — ${label}]:\n${c.content.slice(0, budget)}`;
+    })
+    .join("\n\n---\n\n");
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 2500,
+      max_completion_tokens: 2800,
       messages: [
         {
           role: "system",
-          content: `You are a world-building analyst for novels. Extract ALL named entities from the story.
-Return ONLY a valid JSON object with these arrays (include only entities that clearly appear in the text):
+          content: `Você é um analista de world-building para romances. Extraia TODAS as entidades nomeadas do texto.
+
+REGRAS CRÍTICAS:
+1. O campo "firstChapter" e "chapter" DEVE ser exatamente o número N do marcador [CAPÍTULO N] onde a entidade aparece pela PRIMEIRA VEZ. Jamais invente números de capítulos.
+2. Use apenas capítulos presentes no texto fornecido com marcadores [CAPÍTULO N].
+3. Responda em Português do Brasil (pt-BR). Todas as descrições em português.
+4. Retorne APENAS JSON válido — sem markdown, sem explicações.
+
+Retorne um objeto JSON com estes arrays (inclua apenas entidades que claramente aparecem no texto):
 {
-  "characters": [{"name": "Full Name", "description": "role and personality in 1-2 sentences", "firstChapter": 1}],
-  "organizations": [{"name": "Name", "description": "what kind of organization"}],
-  "factions": [{"name": "Name", "description": "alignment and goals"}],
-  "locations": [{"name": "Name", "description": "what kind of place and its significance"}],
-  "skills": [{"name": "Skill/Ability/Power Name", "owner": "Character Name", "description": "what it does"}],
-  "artifacts": [{"name": "Item Name", "owner": "Character Name or unknown", "description": "what it is and its power"}],
-  "events": [{"description": "Important event in 1 sentence", "chapter": 1, "importance": "high|medium|low"}]
-}
-Be thorough but concise. Return ONLY valid JSON — no markdown, no explanation.`,
+  "characters": [{"name": "Nome Completo", "description": "papel e personalidade em 1-2 frases", "firstChapter": 1}],
+  "organizations": [{"name": "Nome", "description": "tipo de organização e propósito"}],
+  "factions": [{"name": "Nome", "description": "alinhamento e objetivos"}],
+  "locations": [{"name": "Nome", "description": "tipo de lugar e sua importância"}],
+  "skills": [{"name": "Nome da Habilidade/Poder", "owner": "Nome do Personagem", "description": "o que faz"}],
+  "artifacts": [{"name": "Nome do Item", "owner": "Nome do Personagem ou desconhecido", "description": "o que é e seu poder"}],
+  "events": [{"description": "Evento importante em 1 frase em português", "chapter": 1, "importance": "high|medium|low"}]
+}`,
         },
         {
           role: "user",
@@ -95,10 +110,10 @@ Be thorough but concise. Return ONLY valid JSON — no markdown, no explanation.
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) extracted = JSON.parse(jsonMatch[0]);
     } catch {
-      logger.warn("Failed to parse knowledge extraction JSON");
+      logger.warn("Falha ao parsear JSON de extração de conhecimento");
     }
 
-    // Clear existing and re-insert
+    // Limpa e re-insere
     await db.delete(bookKnowledgeTable).where(eq(bookKnowledgeTable.bookId, bookId));
 
     const TYPE_MAP: Record<string, string> = {
@@ -157,10 +172,10 @@ Be thorough but concise. Return ONLY valid JSON — no markdown, no explanation.
       .where(eq(bookKnowledgeTable.bookId, bookId))
       .orderBy(bookKnowledgeTable.entityType, bookKnowledgeTable.name);
 
-    res.json({ entities, extractedFromChapter: upToChapter, totalEntities: entities.length });
+    res.json({ entities, extractedFromChapter: upToChapter, analyzedChapters: MAX_TOTAL, totalEntities: entities.length });
   } catch (err) {
-    logger.error({ err }, "Failed to extract knowledge");
-    res.status(500).json({ error: "Failed to extract knowledge" });
+    logger.error({ err }, "Falha ao extrair conhecimento do livro");
+    res.status(500).json({ error: "Falha ao extrair conhecimento" });
   }
 });
 

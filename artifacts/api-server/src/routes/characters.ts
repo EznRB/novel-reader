@@ -10,26 +10,28 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// Available Microsoft Edge voices for character assignment
+// Vozes Microsoft Edge pt-BR para personagens masculinos
 const MALE_VOICES = [
-  "en-US-GuyNeural",
-  "en-US-BrianNeural",
-  "en-US-JasonNeural",
-  "en-US-RogerNeural",
-  "en-US-TonyNeural",
-  "en-US-DavisNeural",
+  "pt-BR-AntonioNeural",    // protagonista masculino — neutro e claro
+  "pt-BR-DonatoNeural",     // antagonista — grave e sério
+  "pt-BR-FabioNeural",      // personagem de apoio
+  "pt-BR-FranciscoNeural",  // personagem jovem
+  "pt-BR-HumbertoNeural",   // personagem veterano/idoso
+  "pt-BR-JulioNeural",      // personagem secundário
 ];
 
+// Vozes Microsoft Edge pt-BR para personagens femininas
 const FEMALE_VOICES = [
-  "en-US-AriaNeural",
-  "en-US-JennyNeural",
-  "en-US-MichelleNeural",
-  "en-US-MonicaNeural",
-  "en-US-SaraNeural",
-  "en-US-NancyNeural",
+  "pt-BR-FranciscaNeural",  // protagonista feminina — neutra e clara
+  "pt-BR-BrendaNeural",     // personagem de apoio
+  "pt-BR-ElzaNeural",       // personagem veterana/séria
+  "pt-BR-GiovannaNeural",   // personagem jovem e animada
+  "pt-BR-LeticiaNeural",    // personagem misteriosa
+  "pt-BR-ManuelaNeural",    // personagem secundária
 ];
 
-const NARRATOR_VOICE = "en-US-AndrewNeural";
+// Voz fixa do narrador
+const NARRATOR_VOICE = "pt-BR-AntonioNeural";
 
 // GET /books/:id/characters
 router.get("/books/:id/characters", async (req, res): Promise<void> => {
@@ -41,7 +43,7 @@ router.get("/books/:id/characters", async (req, res): Promise<void> => {
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, params.data.id));
   if (!book) {
-    res.status(404).json({ error: "Book not found" });
+    res.status(404).json({ error: "Livro não encontrado" });
     return;
   }
 
@@ -54,7 +56,7 @@ router.get("/books/:id/characters", async (req, res): Promise<void> => {
   res.json(characters);
 });
 
-// POST /books/:id/characters  (AI extraction)
+// POST /books/:id/characters  (extração via IA)
 router.post("/books/:id/characters", async (req, res): Promise<void> => {
   const params = ExtractCharactersParams.safeParse(req.params);
   if (!params.success) {
@@ -64,7 +66,7 @@ router.post("/books/:id/characters", async (req, res): Promise<void> => {
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, params.data.id));
   if (!book) {
-    res.status(404).json({ error: "Book not found" });
+    res.status(404).json({ error: "Livro não encontrado" });
     return;
   }
 
@@ -81,33 +83,47 @@ router.post("/books/:id/characters", async (req, res): Promise<void> => {
     .where(eq(chaptersTable.bookId, params.data.id))
     .orderBy(chaptersTable.chapterNumber);
 
-  const relevantChapters = chapters.filter((c) => c.chapterNumber <= upToChapter);
+  // Estratégia de extração precisa:
+  // - Primeiros 30 capítulos (onde a maioria dos personagens é apresentada): 800 chars cada
+  // - Capítulos 31-60: 400 chars cada
+  // Total: ~20k chars, com marcadores claros de capítulo
+  const MAX_EARLY = 30;
+  const MAX_TOTAL = 60;
+  const relevantChapters = chapters.filter((c) => c.chapterNumber <= Math.min(upToChapter, MAX_TOTAL));
+
   const combinedText = relevantChapters
-    .map((c) => `Chapter ${c.chapterNumber}: ${c.content.slice(0, 3000)}`)
-    .join("\n\n")
-    .slice(0, 15000);
+    .map((c) => {
+      const budget = c.chapterNumber <= MAX_EARLY ? 800 : 400;
+      return `[CAPÍTULO ${c.chapterNumber}]:\n${c.content.slice(0, budget)}`;
+    })
+    .join("\n\n---\n\n");
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 1500,
+      max_completion_tokens: 1800,
       messages: [
         {
           role: "system",
-          content: `You are a literary analyst. Extract characters from the provided novel text.
-Return a JSON array of objects with this structure:
+          content: `Você é um analista literário especializado em romances de fantasia e ficção científica. Extraia os personagens nomeados do texto fornecido.
+
+REGRAS CRÍTICAS:
+1. O campo "firstAppearanceChapter" DEVE ser exatamente o número N do marcador [CAPÍTULO N] onde o personagem aparece pela PRIMEIRA VEZ no texto. Jamais invente números de capítulos que não estão no texto.
+2. Use apenas capítulos presentes no texto fornecido.
+3. Infira o gênero pelos pronomes e pelo contexto (ele/seu/dele = male, ela/sua/dela = female).
+4. Inclua apenas personagens claramente nomeados com papéis significativos.
+5. Responda APENAS com JSON válido, sem markdown.
+
+Retorne um array JSON com esta estrutura:
 [
   {
-    "name": "Character Name",
-    "description": "2-3 sentence description of the character",
+    "name": "Nome do Personagem",
+    "description": "Descrição de 2-3 frases sobre o personagem, seu papel e personalidade",
     "role": "protagonist|antagonist|supporting|minor",
     "gender": "male|female|unknown",
     "firstAppearanceChapter": 1
   }
-]
-Only include characters that are clearly named and have meaningful roles.
-Infer gender from pronouns, names, and context.
-Return valid JSON only.`,
+]`,
         },
         {
           role: "user",
@@ -129,7 +145,7 @@ Return valid JSON only.`,
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (jsonMatch) extracted = JSON.parse(jsonMatch[0]);
     } catch {
-      logger.warn("Failed to parse character extraction JSON");
+      logger.warn("Falha ao parsear JSON de extração de personagens");
     }
 
     await db.delete(charactersTable).where(eq(charactersTable.bookId, params.data.id));
@@ -156,22 +172,22 @@ Return valid JSON only.`,
 
     res.json(characters);
   } catch (err) {
-    logger.error({ err }, "Failed to extract characters");
-    res.status(500).json({ error: "Failed to extract characters" });
+    logger.error({ err }, "Falha ao extrair personagens");
+    res.status(500).json({ error: "Falha ao extrair personagens" });
   }
 });
 
-// POST /books/:id/characters/assign-voices  (AI voice assignment)
+// POST /books/:id/characters/assign-voices  (atribuição de vozes via IA)
 router.post("/books/:id/characters/assign-voices", async (req, res): Promise<void> => {
   const bookId = parseInt(req.params.id, 10);
   if (isNaN(bookId)) {
-    res.status(400).json({ error: "Invalid book ID" });
+    res.status(400).json({ error: "ID de livro inválido" });
     return;
   }
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, bookId));
   if (!book) {
-    res.status(404).json({ error: "Book not found" });
+    res.status(404).json({ error: "Livro não encontrado" });
     return;
   }
 
@@ -181,43 +197,46 @@ router.post("/books/:id/characters/assign-voices", async (req, res): Promise<voi
     .where(eq(charactersTable.bookId, bookId));
 
   if (characters.length === 0) {
-    res.json({ characters: [], message: "No characters found — extract characters first" });
+    res.json({ characters: [], message: "Nenhum personagem encontrado — extraia os personagens primeiro" });
     return;
   }
 
   const charList = characters
-    .map((c) => `ID ${c.id}: ${c.name} | role: ${c.role ?? "unknown"} | gender: ${c.gender ?? "unknown"} | description: ${c.description ?? "no description"}`)
+    .map((c) => `ID ${c.id}: ${c.name} | papel: ${c.role ?? "desconhecido"} | gênero: ${c.gender ?? "desconhecido"} | descrição: ${c.description ?? "sem descrição"}`)
     .join("\n");
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 800,
+      max_completion_tokens: 900,
       messages: [
         {
           role: "system",
-          content: `You are a voice casting director for audiobooks. Assign the best Microsoft Edge neural voice to each character.
+          content: `Você é um diretor de casting para audiolivros em português. Atribua a melhor voz Microsoft Edge Neural (pt-BR) para cada personagem.
 
-Available male voices: ${MALE_VOICES.join(", ")}
-Available female voices: ${FEMALE_VOICES.join(", ")}
-Narrator/default: ${NARRATOR_VOICE}
+VOZES MASCULINAS pt-BR disponíveis: ${MALE_VOICES.join(", ")}
+VOZES FEMININAS pt-BR disponíveis: ${FEMALE_VOICES.join(", ")}
+Narrador/padrão: ${NARRATOR_VOICE}
 
-Assignment rules:
-- Use gender to pick male/female voice pool
-- Protagonist: first voice in their pool (most neutral/clear)
-- Antagonist: a deeper/darker voice (GuyNeural for male, MonicaNeural for female)
-- Young characters: lighter voices (BrianNeural, SaraNeural)
-- Veteran/old characters: deeper voices (RogerNeural, NancyNeural)
-- Each important character should get a UNIQUE voice
-- Minor characters can share voices
+REGRAS DE ATRIBUIÇÃO:
+- Use o gênero do personagem para escolher vozes masculinas ou femininas
+- Protagonista: primeira voz da lista (mais neutra/clara) — NUNCA a mesma que o narrador
+- Antagonista masculino: pt-BR-DonatoNeural (grave e sério)
+- Personagens jovens masculinos: pt-BR-FranciscoNeural
+- Personagens veteranos/idosos masculinos: pt-BR-HumbertoNeural
+- Antagonista feminina: pt-BR-ElzaNeural
+- Personagens jovens femininas: pt-BR-GiovannaNeural
+- Cada personagem PRINCIPAL deve ter uma voz ÚNICA
+- Personagens menores podem compartilhar vozes
+- NÃO atribua ${NARRATOR_VOICE} a nenhum personagem (essa é a voz exclusiva do narrador)
 
-Return a JSON array — one entry per character ID:
-[{"id": 1, "assignedVoice": "en-US-GuyNeural", "gender": "male"}]
-Return valid JSON only.`,
+Retorne um array JSON — uma entrada por ID de personagem:
+[{"id": 1, "assignedVoice": "pt-BR-AntonioNeural", "gender": "male"}]
+Retorne APENAS JSON válido.`,
         },
         {
           role: "user",
-          content: `Book: "${book.title}"\n\nCharacters:\n${charList}`,
+          content: `Livro: "${book.title}"\n\nPersonagens:\n${charList}`,
         },
       ],
     });
@@ -229,16 +248,19 @@ Return valid JSON only.`,
       const jsonMatch = raw.match(/\[[\s\S]*\]/);
       if (jsonMatch) assignments = JSON.parse(jsonMatch[0]);
     } catch {
-      logger.warn("Failed to parse voice assignment JSON");
+      logger.warn("Falha ao parsear JSON de atribuição de vozes");
     }
 
-    // Apply assignments
+    // Aplica atribuições — nunca usa a voz do narrador em personagens
     for (const assignment of assignments) {
       if (!assignment.id || !assignment.assignedVoice) continue;
+      const voice = assignment.assignedVoice === NARRATOR_VOICE
+        ? (assignment.gender === "female" ? FEMALE_VOICES[0] : MALE_VOICES[1])
+        : assignment.assignedVoice;
       await db
         .update(charactersTable)
         .set({
-          assignedVoice: assignment.assignedVoice,
+          assignedVoice: voice,
           gender: assignment.gender ?? null,
         })
         .where(eq(charactersTable.id, assignment.id));
@@ -252,8 +274,8 @@ Return valid JSON only.`,
 
     res.json({ characters: updated, narratorVoice: NARRATOR_VOICE });
   } catch (err) {
-    logger.error({ err }, "Failed to assign character voices");
-    res.status(500).json({ error: "Failed to assign character voices" });
+    logger.error({ err }, "Falha ao atribuir vozes");
+    res.status(500).json({ error: "Falha ao atribuir vozes" });
   }
 });
 

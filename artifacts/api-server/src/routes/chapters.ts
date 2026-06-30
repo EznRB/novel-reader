@@ -21,7 +21,7 @@ router.get("/books/:id/chapters", async (req, res): Promise<void> => {
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, params.data.id));
   if (!book) {
-    res.status(404).json({ error: "Book not found" });
+    res.status(404).json({ error: "Livro não encontrado" });
     return;
   }
 
@@ -53,7 +53,7 @@ router.get("/books/:id/chapters/:chapterNumber", async (req, res): Promise<void>
     );
 
   if (!chapter) {
-    res.status(404).json({ error: "Chapter not found" });
+    res.status(404).json({ error: "Capítulo não encontrado" });
     return;
   }
 
@@ -79,11 +79,11 @@ router.get("/books/:id/chapters/:chapterNumber/summary", async (req, res): Promi
     );
 
   if (!chapter) {
-    res.status(404).json({ error: "Chapter not found" });
+    res.status(404).json({ error: "Capítulo não encontrado" });
     return;
   }
 
-  // Return cached summary if exists
+  // Retorna resumo em cache se existir
   const [existing] = await db
     .select()
     .from(chapterSummariesTable)
@@ -105,37 +105,40 @@ router.get("/books/:id/chapters/:chapterNumber/summary", async (req, res): Promi
     return;
   }
 
-  // Generate AI summary — structured format
+  // Gera resumo via IA — formato estruturado em português
   const contentSnippet = chapter.content.slice(0, 12000);
-  const chapterLabel = `Chapter ${params.data.chapterNumber}${chapter.title ? ` — ${chapter.title}` : ""}`;
+  const chapterLabel = `Capítulo ${params.data.chapterNumber}${chapter.title ? ` — ${chapter.title}` : ""}`;
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 900,
+      max_completion_tokens: 1100,
       messages: [
         {
           role: "system",
-          content: `You are a literary assistant specializing in story analysis. Analyze the chapter and return a JSON object.
+          content: `Você é um assistente literário especializado em análise de histórias. Analise o capítulo e retorne um objeto JSON.
 
-Return ONLY valid JSON with this exact structure:
+IMPORTANTE: Responda SEMPRE em Português do Brasil (pt-BR). Todos os textos nos campos devem ser em português.
+
+Retorne APENAS um JSON válido com esta estrutura exata:
 {
-  "quickSummary": "2-3 sentence summary for quick review",
-  "fullSummary": "Detailed 2-4 paragraph summary covering plot events, character development, and revelations",
-  "charactersPresent": ["Name1", "Name2"],
-  "keyEvents": ["Event description 1", "Event description 2"],
-  "revelations": ["New discovery or plot twist revealed"],
-  "powerChanges": ["Character X acquired skill Y", "Character Z evolved power"]
+  "quickSummary": "Resumo de 2-3 frases para revisão rápida",
+  "fullSummary": "Resumo detalhado em 2-4 parágrafos cobrindo eventos do enredo, desenvolvimento de personagens e revelações",
+  "charactersPresent": ["Nome1", "Nome2"],
+  "keyEvents": ["Descrição do evento 1", "Descrição do evento 2"],
+  "revelations": ["Nova descoberta ou reviravolta revelada"],
+  "powerChanges": ["Personagem X adquiriu habilidade Y", "Personagem Z evoluiu poder"]
 }
 
-Rules:
-- quickSummary: 2-3 sentences maximum, no spoilers beyond this chapter
-- fullSummary: detailed but focused on THIS chapter only
-- charactersPresent: only named characters who appear in this chapter
-- keyEvents: most important plot events, be specific
-- revelations: new information revealed to the reader/protagonist
-- powerChanges: new skills, abilities, level-ups, evolutions (empty array if none)
-Return valid JSON only — no markdown.`,
+Regras:
+- quickSummary: máximo 2-3 frases, sem spoilers além deste capítulo
+- fullSummary: detalhado mas focado SOMENTE neste capítulo
+- charactersPresent: apenas personagens nomeados que aparecem neste capítulo
+- keyEvents: eventos mais importantes do enredo, seja específico
+- revelations: novas informações reveladas ao leitor/protagonista
+- powerChanges: novas habilidades, evoluções de poder, up de nível (array vazio se nenhum)
+- Use os nomes dos personagens como aparecem no texto original
+Retorne APENAS JSON válido — sem markdown.`,
         },
         {
           role: "user",
@@ -158,7 +161,7 @@ Return valid JSON only — no markdown.`,
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
     } catch {
-      logger.warn("Failed to parse structured summary JSON — falling back to plain text");
+      logger.warn("Falha ao parsear JSON do resumo estruturado — fallback para texto simples");
       parsed = { fullSummary: raw };
     }
 
@@ -195,8 +198,8 @@ Return valid JSON only — no markdown.`,
       createdAt: saved.createdAt,
     });
   } catch (err) {
-    logger.error({ err }, "Failed to generate chapter summary");
-    res.status(500).json({ error: "Failed to generate summary" });
+    logger.error({ err }, "Falha ao gerar resumo do capítulo");
+    res.status(500).json({ error: "Falha ao gerar resumo" });
   }
 });
 

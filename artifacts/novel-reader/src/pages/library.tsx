@@ -31,7 +31,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-const TABS = ["All", "Favorites", "Reading"] as const;
+const TABS = ["Todos", "Favoritos", "Lendo"] as const;
 type Tab = (typeof TABS)[number];
 
 const stagger = {
@@ -88,28 +88,28 @@ function BookCard({
     <motion.div variants={fadeUp} layout>
       <Link href={`/book/${book.id}`} data-testid={`card-book-${book.id}`}>
         <div className="group relative bg-card border border-border rounded-lg overflow-hidden hover:border-primary/60 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/30">
-          {/* Cover */}
+          {/* Capa */}
           <div className="aspect-[2/3] relative overflow-hidden">
             {book.coverImage ? (
               <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
             ) : (
               <CoverPlaceholder title={book.title} id={book.id} />
             )}
-            {/* Progress bar */}
+            {/* Barra de progresso */}
             {progress && progress.percentComplete > 0 && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
                 <div className="progress-bar-fill" style={{ width: `${progress.percentComplete}%` }} />
               </div>
             )}
-            {/* Reading badge */}
+            {/* Badge "Lendo" */}
             {progress && progress.currentChapter > 1 && (
               <div className="absolute top-2 left-2">
                 <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-primary text-primary-foreground rounded uppercase tracking-wide">
-                  Reading
+                  Lendo
                 </span>
               </div>
             )}
-            {/* Action buttons — visible on hover */}
+            {/* Botões de ação — visíveis ao hover */}
             <div className="absolute top-2 right-2 flex flex-col gap-1.5">
               <button
                 data-testid={`btn-favorite-${book.id}`}
@@ -127,7 +127,7 @@ function BookCard({
               </button>
             </div>
           </div>
-          {/* Info */}
+          {/* Informações */}
           <div className="p-3">
             <h3 className="font-medium text-foreground text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
               {book.title}
@@ -136,7 +136,7 @@ function BookCard({
               <p className="text-xs text-muted-foreground mt-1 truncate">{book.author}</p>
             )}
             <div className="flex items-center gap-1 mt-2">
-              <span className="text-xs text-muted-foreground">{book.totalChapters} ch.</span>
+              <span className="text-xs text-muted-foreground">{book.totalChapters} cap.</span>
               {book.tags.slice(0, 1).map((t) => (
                 <span key={t} className="genre-chip ml-1">{t}</span>
               ))}
@@ -165,7 +165,7 @@ function RecentRow({ book }: {
             {book.title}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Ch. {book.currentChapter} / {book.totalChapters}
+            Cap. {book.currentChapter} / {book.totalChapters}
           </p>
           <div className="w-full h-1 bg-secondary rounded-full mt-2 overflow-hidden">
             <div className="progress-bar-fill" style={{ width: `${book.percentComplete}%` }} />
@@ -181,7 +181,7 @@ type SortKey = "recent" | "title-asc" | "title-desc" | "favorites" | "progress";
 
 export default function LibraryPage() {
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<Tab>("All");
+  const [tab, setTab] = useState<Tab>("Todos");
   const [sort, setSort] = useState<SortKey>("recent");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
   const { data: books, isLoading } = useListBooks();
@@ -232,15 +232,15 @@ export default function LibraryPage() {
       (b.author ?? "").toLowerCase().includes(q) ||
       b.tags.some((t) => t.toLowerCase().includes(q));
     const matchesTab =
-      tab === "All" ||
-      (tab === "Favorites" && b.isFavorite) ||
-      (tab === "Reading" && (progressMap.get(b.id)?.currentChapter ?? 1) > 1);
+      tab === "Todos" ||
+      (tab === "Favoritos" && b.isFavorite) ||
+      (tab === "Lendo" && (progressMap.get(b.id)?.currentChapter ?? 1) > 1);
     return matchesSearch && matchesTab;
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === "title-asc") return a.title.localeCompare(b.title);
-    if (sort === "title-desc") return b.title.localeCompare(a.title);
+    if (sort === "title-asc") return a.title.localeCompare(b.title, "pt-BR");
+    if (sort === "title-desc") return b.title.localeCompare(a.title, "pt-BR");
     if (sort === "favorites") {
       if (a.isFavorite === b.isFavorite) return 0;
       return a.isFavorite ? -1 : 1;
@@ -250,14 +250,14 @@ export default function LibraryPage() {
       const pb = progressMap.get(b.id)?.percentComplete ?? 0;
       return pb - pa;
     }
-    return 0; // "recent" — keep API order (updatedAt desc)
+    return 0;
   });
 
   const recentActive = (recent ?? []).filter((r) => r.currentChapter > 1 || r.lastReadAt).slice(0, 5);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Cabeçalho */}
       <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           {/* Logo */}
@@ -268,20 +268,20 @@ export default function LibraryPage() {
             <span className="font-bold text-foreground text-lg hidden sm:block">NoveLit</span>
           </Link>
 
-          {/* Search */}
+          {/* Busca */}
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               data-testid="input-search"
               className="pl-9 bg-secondary border-border text-sm h-9"
-              placeholder="Search title, author, tag..."
+              placeholder="Buscar título, autor, tag..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <Button variant="ghost" size="icon" className="h-9 w-9" asChild title="Profile">
+            <Button variant="ghost" size="icon" className="h-9 w-9" asChild title="Perfil">
               <Link href="/profile" data-testid="btn-profile">
                 <User className="w-4 h-4" />
               </Link>
@@ -289,13 +289,13 @@ export default function LibraryPage() {
             <Button asChild size="sm" data-testid="btn-import" className="bg-primary hover:bg-primary/90">
               <Link href="/import">
                 <Plus className="w-3.5 h-3.5 mr-1.5" />
-                Import
+                Importar
               </Link>
             </Button>
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Abas */}
         <div className="max-w-6xl mx-auto px-4 pb-0">
           <div className="flex items-center gap-1">
             {TABS.map((t) => (
@@ -317,12 +317,12 @@ export default function LibraryPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        {/* Continue reading */}
-        {tab === "All" && !search && recentActive.length > 0 && (
+        {/* Continuar lendo */}
+        {tab === "Todos" && !search && recentActive.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Flame className="w-4 h-4 text-primary" />
-              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Continue Reading</h2>
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Continuar Lendo</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {recentActive.map((b) => (
@@ -332,12 +332,12 @@ export default function LibraryPage() {
           </section>
         )}
 
-        {/* Stats bar */}
+        {/* Barra de stats */}
         {!search && books && books.length > 0 && (
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5" />{books.length} novels</span>
-            <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" />{books.filter((b) => b.isFavorite).length} favorites</span>
-            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{recentActive.length} in progress</span>
+            <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" />{books.filter((b) => b.isFavorite).length} favoritos</span>
+            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{recentActive.length} em andamento</span>
             <div className="ml-auto">
               <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
                 <SelectTrigger className="h-7 w-auto border-0 bg-transparent text-xs text-muted-foreground gap-1.5 px-2 hover:text-foreground transition-colors focus:ring-0 shadow-none">
@@ -345,11 +345,11 @@ export default function LibraryPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="end">
-                  <SelectItem value="recent" className="text-xs">Recently updated</SelectItem>
-                  <SelectItem value="title-asc" className="text-xs">Title A → Z</SelectItem>
-                  <SelectItem value="title-desc" className="text-xs">Title Z → A</SelectItem>
-                  <SelectItem value="favorites" className="text-xs">Favorites first</SelectItem>
-                  <SelectItem value="progress" className="text-xs">Most progress</SelectItem>
+                  <SelectItem value="recent" className="text-xs">Atualizado recentemente</SelectItem>
+                  <SelectItem value="title-asc" className="text-xs">Título A → Z</SelectItem>
+                  <SelectItem value="title-desc" className="text-xs">Título Z → A</SelectItem>
+                  <SelectItem value="favorites" className="text-xs">Favoritos primeiro</SelectItem>
+                  <SelectItem value="progress" className="text-xs">Mais progresso</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -375,15 +375,19 @@ export default function LibraryPage() {
               </div>
               <div>
                 <p className="font-medium text-foreground">
-                  {search ? "No results found" : tab !== "All" ? `No ${tab.toLowerCase()} books` : "Your library is empty"}
+                  {search
+                    ? "Nenhum resultado encontrado"
+                    : tab !== "Todos"
+                    ? `Nenhum livro em "${tab}"`
+                    : "Sua biblioteca está vazia"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {search ? "Try a different search" : "Import a novel to get started"}
+                  {search ? "Tente outra busca" : "Importe um romance para começar"}
                 </p>
               </div>
-              {!search && tab === "All" && (
+              {!search && tab === "Todos" && (
                 <Button asChild size="sm" variant="outline">
-                  <Link href="/import"><Plus className="w-3.5 h-3.5 mr-1.5" />Import your first novel</Link>
+                  <Link href="/import"><Plus className="w-3.5 h-3.5 mr-1.5" />Importar seu primeiro romance</Link>
                 </Button>
               )}
             </div>
@@ -408,22 +412,22 @@ export default function LibraryPage() {
         </section>
       </main>
 
-      {/* Delete confirmation dialog */}
+      {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleteTarget?.title}"?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir "{deleteTarget?.title}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove this book and all its chapters, progress, summaries, and character data. This cannot be undone.
+              Isso removerá permanentemente o livro e todos os seus capítulos, progresso de leitura, resumos e dados de personagens. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              Delete
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

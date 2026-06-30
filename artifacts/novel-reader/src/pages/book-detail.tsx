@@ -59,13 +59,13 @@ const COLORS = [
 ];
 
 const ENTITY_TYPE_CONFIG = [
-  { type: "character",     label: "Characters",     icon: Users,     color: "text-blue-400",   bg: "bg-blue-950/40 border-blue-800/40"   },
-  { type: "organization",  label: "Organizations",  icon: Building2, color: "text-purple-400", bg: "bg-purple-950/40 border-purple-800/40" },
-  { type: "faction",       label: "Factions",       icon: Swords,    color: "text-red-400",    bg: "bg-red-950/40 border-red-800/40"     },
-  { type: "location",      label: "Locations",      icon: MapPin,    color: "text-green-400",  bg: "bg-green-950/40 border-green-800/40" },
-  { type: "skill",         label: "Skills & Powers",icon: Zap,       color: "text-yellow-400", bg: "bg-yellow-950/40 border-yellow-800/40"},
-  { type: "artifact",      label: "Artifacts",      icon: Gem,       color: "text-orange-400", bg: "bg-orange-950/40 border-orange-800/40"},
-  { type: "event",         label: "Key Events",     icon: Calendar,  color: "text-cyan-400",   bg: "bg-cyan-950/40 border-cyan-800/40"   },
+  { type: "character",     label: "Personagens",        icon: Users,     color: "text-blue-400",   bg: "bg-blue-950/40 border-blue-800/40"   },
+  { type: "organization",  label: "Organizações",        icon: Building2, color: "text-purple-400", bg: "bg-purple-950/40 border-purple-800/40" },
+  { type: "faction",       label: "Facções",             icon: Swords,    color: "text-red-400",    bg: "bg-red-950/40 border-red-800/40"     },
+  { type: "location",      label: "Locais",              icon: MapPin,    color: "text-green-400",  bg: "bg-green-950/40 border-green-800/40" },
+  { type: "skill",         label: "Habilidades & Poderes",icon: Zap,      color: "text-yellow-400", bg: "bg-yellow-950/40 border-yellow-800/40"},
+  { type: "artifact",      label: "Artefatos",           icon: Gem,       color: "text-orange-400", bg: "bg-orange-950/40 border-orange-800/40"},
+  { type: "event",         label: "Eventos Importantes", icon: Calendar,  color: "text-cyan-400",   bg: "bg-cyan-950/40 border-cyan-800/40"   },
 ] as const;
 
 function CoverArt({ title, id, large }: { title: string; id: number; large?: boolean }) {
@@ -147,11 +147,11 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListCharactersQueryKey(bookId) });
-          toast({ title: "Characters extracted", description: "AI identified characters in your novel." });
+          toast({ title: "Personagens extraídos", description: "A IA identificou os personagens do seu romance." });
           setExtracting(false);
         },
         onError: () => {
-          toast({ title: "Failed", description: "Could not extract characters.", variant: "destructive" });
+          toast({ title: "Falhou", description: "Não foi possível extrair os personagens.", variant: "destructive" });
           setExtracting(false);
         },
       }
@@ -166,13 +166,13 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
         onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: getListBookKnowledgeQueryKey(bookId) });
           toast({
-            title: "World memory extracted",
-            description: `Found ${data.totalEntities} entities up to chapter ${data.extractedFromChapter}.`,
+            title: "Memória extraída",
+            description: `${data.totalEntities} entidades encontradas até o capítulo ${data.extractedFromChapter}.`,
           });
           setExtractingKnowledge(false);
         },
         onError: () => {
-          toast({ title: "Failed", description: "Could not extract world knowledge.", variant: "destructive" });
+          toast({ title: "Falhou", description: "Não foi possível extrair o conhecimento do mundo.", variant: "destructive" });
           setExtractingKnowledge(false);
         },
       }
@@ -187,13 +187,13 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
         onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: getListCharactersQueryKey(bookId) });
           toast({
-            title: "Voices assigned",
-            description: `${data.characters.length} characters received unique voices. Narrator: ${data.narratorVoice}.`,
+            title: "Vozes atribuídas",
+            description: `${data.characters.length} personagens receberam vozes únicas. Narrador: ${data.narratorVoice}.`,
           });
           setAssigningVoices(false);
         },
         onError: () => {
-          toast({ title: "Failed", description: "Could not assign voices.", variant: "destructive" });
+          toast({ title: "Falhou", description: "Não foi possível atribuir vozes.", variant: "destructive" });
           setAssigningVoices(false);
         },
       }
@@ -212,10 +212,10 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
       if (res.ok || res.status === 204) {
         setLocation("/");
       } else {
-        toast({ title: "Delete failed", description: "Could not delete this book.", variant: "destructive" });
+        toast({ title: "Falha ao excluir", description: "Não foi possível excluir este livro.", variant: "destructive" });
       }
     } catch {
-      toast({ title: "Delete failed", description: "Network error.", variant: "destructive" });
+      toast({ title: "Falha ao excluir", description: "Erro de rede.", variant: "destructive" });
     }
   };
 
@@ -231,13 +231,13 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
       const res = await fetch(`${base}/api/books/${bookId}/cover`, { method: "POST", body: formData });
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: getGetBookQueryKey(bookId) });
-        toast({ title: "Cover updated!" });
+        toast({ title: "Capa atualizada!" });
       } else {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "Upload failed", description: (err as { error?: string }).error ?? "Unknown error", variant: "destructive" });
+        toast({ title: "Falha no upload", description: (err as { error?: string }).error ?? "Erro desconhecido", variant: "destructive" });
       }
     } catch {
-      toast({ title: "Upload failed", description: "Network error.", variant: "destructive" });
+      toast({ title: "Falha no upload", description: "Erro de rede.", variant: "destructive" });
     } finally {
       setCoverUploading(false);
     }
@@ -263,14 +263,13 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
-          <p className="text-muted-foreground">Book not found</p>
-          <Button asChild variant="link"><Link href="/">Back to library</Link></Button>
+          <p className="text-muted-foreground">Livro não encontrado</p>
+          <Button asChild variant="link"><Link href="/">Voltar à biblioteca</Link></Button>
         </div>
       </div>
     );
   }
 
-  // Group knowledge by entity type
   const knowledgeByType = ENTITY_TYPE_CONFIG.reduce((acc, { type }) => {
     acc[type] = (knowledge ?? []).filter((e) => e.entityType === type);
     return acc;
@@ -278,7 +277,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Cabeçalho */}
       <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
@@ -306,18 +305,18 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete "{book.title}"?</AlertDialogTitle>
+                  <AlertDialogTitle>Excluir "{book.title}"?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete the book along with all its chapters, reading progress, AI summaries, and character data. This cannot be undone.
+                    Isso excluirá permanentemente o livro junto com todos os seus capítulos, progresso de leitura, resumos de IA e dados de personagens. Esta ação não pode ser desfeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}
                     className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                   >
-                    Delete book
+                    Excluir livro
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -333,7 +332,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
             <div
               className="w-32 h-48 sm:w-40 sm:h-60 rounded-lg overflow-hidden border border-border shadow-xl relative group cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
-              title="Click to change cover"
+              title="Clique para trocar a capa"
             >
               {book.coverImage ? (
                 <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
@@ -346,7 +345,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                 ) : (
                   <>
                     <Camera className="w-6 h-6 text-white" />
-                    <span className="text-white text-xs font-medium">Change Cover</span>
+                    <span className="text-white text-xs font-medium">Trocar Capa</span>
                   </>
                 )}
               </div>
@@ -366,7 +365,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                 {book.title}
               </h1>
               {book.author && (
-                <p className="text-muted-foreground text-sm mt-1" data-testid="text-book-author">by {book.author}</p>
+                <p className="text-muted-foreground text-sm mt-1" data-testid="text-book-author">por {book.author}</p>
               )}
             </div>
 
@@ -386,10 +385,10 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
 
             {stats && (
               <div className="flex flex-wrap gap-2">
-                <StatPill value={stats.totalChapters} label="Chapters" icon={BookOpen} />
-                <StatPill value={(stats.totalWords / 1000).toFixed(0) + "k"} label="Words" icon={BarChart2} />
-                <StatPill value={stats.characterCount} label="Characters" icon={Users} />
-                <StatPill value={`${stats.percentComplete}%`} label="Progress" icon={BookMarked} />
+                <StatPill value={stats.totalChapters} label="Capítulos" icon={BookOpen} />
+                <StatPill value={(stats.totalWords / 1000).toFixed(0) + "k"} label="Palavras" icon={BarChart2} />
+                <StatPill value={stats.characterCount} label="Personagens" icon={Users} />
+                <StatPill value={`${stats.percentComplete}%`} label="Progresso" icon={BookMarked} />
               </div>
             )}
 
@@ -408,17 +407,17 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                 data-testid="btn-start-reading"
               >
                 <BookOpen className="w-4 h-4 mr-2" />
-                {stats && stats.percentComplete > 0 ? `Continue Ch.${currentChapter}` : "Start Reading"}
+                {stats && stats.percentComplete > 0 ? `Continuar Cap.${currentChapter}` : "Começar a Ler"}
               </Button>
               <Button variant="outline" asChild data-testid="btn-ask-ai">
                 <Link href={`/book/${bookId}/ask`}>
-                  <MessageSquare className="w-3.5 h-3.5 mr-2" />AI Q&A
+                  <MessageSquare className="w-3.5 h-3.5 mr-2" />Perguntar à IA
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => handleExport("epub")} title="Export EPUB" data-testid="btn-export-epub">
+              <Button variant="ghost" size="icon" onClick={() => handleExport("epub")} title="Exportar EPUB" data-testid="btn-export-epub">
                 <Download className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => handleExport("pdf")} title="Export PDF" data-testid="btn-export-pdf">
+              <Button variant="ghost" size="icon" onClick={() => handleExport("pdf")} title="Exportar PDF" data-testid="btn-export-pdf">
                 <FileText className="w-4 h-4" />
               </Button>
             </div>
@@ -427,12 +426,12 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
 
         <Separator />
 
-        {/* Characters */}
+        {/* Personagens */}
         <section>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
-              <h2 className="font-semibold text-foreground">Characters</h2>
+              <h2 className="font-semibold text-foreground">Personagens</h2>
               {characters && characters.length > 0 && (
                 <Badge variant="secondary" className="text-xs">{characters.length}</Badge>
               )}
@@ -447,9 +446,9 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                   data-testid="btn-assign-voices"
                 >
                   {assigningVoices ? (
-                    <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Assigning…</>
+                    <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Atribuindo…</>
                   ) : (
-                    <><Mic className="w-3 h-3 mr-1.5" />Assign Voices</>
+                    <><Mic className="w-3 h-3 mr-1.5" />Atribuir Vozes</>
                   )}
                 </Button>
               )}
@@ -461,9 +460,9 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                 data-testid="btn-extract-characters"
               >
                 {extracting ? (
-                  <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Extracting…</>
+                  <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Extraindo…</>
                 ) : (
-                  <><Sparkles className="w-3 h-3 mr-1.5" />Extract with AI</>
+                  <><Sparkles className="w-3 h-3 mr-1.5" />Extrair com IA</>
                 )}
               </Button>
             </div>
@@ -482,9 +481,19 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                     <h3 className="font-medium text-foreground text-sm">{c.name}</h3>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {c.gender && (
-                        <Badge variant="outline" className="text-[10px] capitalize">{c.gender}</Badge>
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {c.gender === "male" ? "masc." : c.gender === "female" ? "fem." : c.gender}
+                        </Badge>
                       )}
-                      {c.role && <Badge variant="outline" className="text-[10px] capitalize">{c.role}</Badge>}
+                      {c.role && (
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {c.role === "protagonist" ? "Protagonista"
+                            : c.role === "antagonist" ? "Antagonista"
+                            : c.role === "supporting" ? "Secundário"
+                            : c.role === "minor" ? "Menor"
+                            : c.role}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   {c.description && (
@@ -493,13 +502,13 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                   <div className="flex items-center justify-between mt-2">
                     {c.firstAppearanceChapter && (
                       <p className="text-[10px] text-muted-foreground font-mono">
-                        First: Ch.{c.firstAppearanceChapter}
+                        1ª aparição: Cap.{c.firstAppearanceChapter}
                       </p>
                     )}
                     {c.assignedVoice && (
                       <div className="flex items-center gap-1 text-[10px] text-blue-400">
                         <Volume2 className="w-2.5 h-2.5" />
-                        <span className="font-mono truncate max-w-[120px]">{c.assignedVoice}</span>
+                        <span className="font-mono truncate max-w-[140px]">{c.assignedVoice}</span>
                       </div>
                     )}
                   </div>
@@ -509,21 +518,21 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
           ) : (
             <div className="border border-dashed border-border rounded-xl p-8 text-center">
               <Users className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No characters yet. Use AI to extract them.</p>
+              <p className="text-sm text-muted-foreground">Nenhum personagem ainda. Use a IA para extraí-los.</p>
             </div>
           )}
         </section>
 
         <Separator />
 
-        {/* World Memory — Memória da História */}
+        {/* Memória da História */}
         <section>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Brain className="w-4 h-4 text-primary" />
               <h2 className="font-semibold text-foreground">Memória da História</h2>
               {knowledge && knowledge.length > 0 && (
-                <Badge variant="secondary" className="text-xs">{knowledge.length} entities</Badge>
+                <Badge variant="secondary" className="text-xs">{knowledge.length} entidades</Badge>
               )}
             </div>
             <Button
@@ -534,9 +543,9 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
               data-testid="btn-extract-knowledge"
             >
               {extractingKnowledge ? (
-                <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Extracting…</>
+                <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Extraindo…</>
               ) : (
-                <><Brain className="w-3 h-3 mr-1.5" />Extract World</>
+                <><Brain className="w-3 h-3 mr-1.5" />Extrair Mundo</>
               )}
             </Button>
           </div>
@@ -569,7 +578,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                           )}
                           {entity.firstAppearanceChapter && (
                             <p className="text-[10px] text-muted-foreground/60 mt-1.5 font-mono">
-                              Ch.{entity.firstAppearanceChapter}
+                              Cap.{entity.firstAppearanceChapter}
                             </p>
                           )}
                         </div>
@@ -583,10 +592,10 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
             <div className="border border-dashed border-border rounded-xl p-8 text-center">
               <Brain className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
-                No world memory yet. Click "Extract World" to build a knowledge base from chapters read.
+                Nenhuma memória ainda. Clique em "Extrair Mundo" para construir uma base de conhecimento dos capítulos lidos.
               </p>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                Extracts characters, organizations, locations, skills, artifacts, and key events.
+                Extrai personagens, organizações, locais, habilidades, artefatos e eventos importantes.
               </p>
             </div>
           )}
@@ -594,11 +603,11 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
 
         <Separator />
 
-        {/* Chapter list */}
+        {/* Lista de capítulos */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <BookOpen className="w-4 h-4 text-primary" />
-            <h2 className="font-semibold text-foreground">Chapters</h2>
+            <h2 className="font-semibold text-foreground">Capítulos</h2>
             {chapters && <Badge variant="secondary" className="text-xs">{chapters.length}</Badge>}
           </div>
 
@@ -625,15 +634,15 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-medium truncate ${isCurrent ? "text-primary" : isRead ? "text-muted-foreground" : "text-foreground"}`}>
-                            {ch.title ?? `Chapter ${ch.chapterNumber}`}
+                            {ch.title ?? `Capítulo ${ch.chapterNumber}`}
                           </p>
                           <p className="text-[11px] text-muted-foreground">
-                            {ch.wordCount.toLocaleString()} words · ~{Math.max(1, Math.round(ch.wordCount / 200))} min
+                            {ch.wordCount.toLocaleString("pt-BR")} palavras · ~{Math.max(1, Math.round(ch.wordCount / 200))} min
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {isCurrent && <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">Reading</Badge>}
-                          {isRead && !isCurrent && <Badge variant="secondary" className="text-[10px]">Done</Badge>}
+                          {isCurrent && <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">Lendo</Badge>}
+                          {isRead && !isCurrent && <Badge variant="secondary" className="text-[10px]">Lido</Badge>}
                           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </div>
