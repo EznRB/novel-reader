@@ -27,7 +27,7 @@ import {
   getListChaptersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AudioPlayer, type Voice } from "@/components/audio-player";
+import { AudioPlayer } from "@/components/audio-player";
 
 /* ── Helpers ── */
 function splitSentences(text: string): string[] {
@@ -60,23 +60,23 @@ function useLocalStorage<T>(key: string, init: T): [T, (v: T) => void] {
   return [value, set];
 }
 
-/* ── Reader Theme types ── */
+/* ── Tipos de tema ── */
 type ReaderTheme = "dark" | "sepia" | "light";
-type ReaderFont = "serif" | "sans";
-
-const THEME_CLASSES: Record<ReaderTheme, string> = {
-  dark: "",
-  sepia: "reader-sepia",
-  light: "reader-light",
-};
+type ReaderFont  = "serif" | "sans";
 
 const THEME_BG: Record<ReaderTheme, string> = {
-  dark: "bg-[#0f1117]",
+  dark:  "bg-[#0f1117]",
   sepia: "bg-[#f5ead0]",
   light: "bg-white",
 };
 
-/* ── Painel de Resumo aprimorado ── */
+const THEME_CLASS: Record<ReaderTheme, string> = {
+  dark:  "",
+  sepia: "reader-sepia",
+  light: "reader-light",
+};
+
+/* ── Painel de Resumo ── */
 function SummaryPanel({ bookId, chapterNumber, onClose }: {
   bookId: number; chapterNumber: number; onClose: () => void;
 }) {
@@ -116,19 +116,15 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
           </div>
         ) : summary ? (
           <>
-            {/* Resumo rápido — card destacado */}
             {summary.quickSummary && (
               <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
                 <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1.5">
                   ⚡ Resumo Rápido
                 </p>
-                <p className="text-sm leading-relaxed text-foreground">
-                  {summary.quickSummary}
-                </p>
+                <p className="text-sm leading-relaxed text-foreground">{summary.quickSummary}</p>
               </div>
             )}
 
-            {/* Personagens presentes */}
             {summary.charactersPresent && summary.charactersPresent.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
@@ -139,10 +135,7 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {summary.charactersPresent.map((name) => (
-                    <span
-                      key={name}
-                      className="text-xs bg-blue-950/60 text-blue-300 border border-blue-800/50 px-2 py-0.5 rounded-full"
-                    >
+                    <span key={name} className="text-xs bg-blue-950/60 text-blue-300 border border-blue-800/50 px-2 py-0.5 rounded-full">
                       {name}
                     </span>
                   ))}
@@ -150,7 +143,6 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Eventos principais */}
             {summary.keyEvents && summary.keyEvents.length > 0 && (
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -167,14 +159,11 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Revelações */}
             {summary.revelations && summary.revelations.length > 0 && (
               <div className="bg-yellow-950/30 border border-yellow-800/30 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Eye className="w-3 h-3 text-yellow-400" />
-                  <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wide">
-                    Revelações
-                  </p>
+                  <p className="text-[10px] font-semibold text-yellow-400 uppercase tracking-wide">Revelações</p>
                 </div>
                 <ul className="space-y-1.5">
                   {summary.revelations.map((r, i) => (
@@ -187,14 +176,11 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Mudanças de poder */}
             {summary.powerChanges && summary.powerChanges.length > 0 && (
               <div className="bg-blue-950/30 border border-blue-800/30 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Zap className="w-3 h-3 text-blue-400" />
-                  <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">
-                    Mudanças de Poder
-                  </p>
+                  <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">Mudanças de Poder</p>
                 </div>
                 <ul className="space-y-1.5">
                   {summary.powerChanges.map((p, i) => (
@@ -207,15 +193,11 @@ function SummaryPanel({ bookId, chapterNumber, onClose }: {
               </div>
             )}
 
-            {/* Resumo completo */}
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Resumo Completo
               </p>
-              <p
-                className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line"
-                data-testid="text-summary"
-              >
+              <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line" data-testid="text-summary">
                 {summary.summary}
               </p>
             </div>
@@ -263,7 +245,7 @@ function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {chapters.map((ch) => {
           const isActive = ch.chapterNumber === currentChapter;
-          const isRead = ch.chapterNumber < currentChapter;
+          const isRead   = ch.chapterNumber < currentChapter;
           return (
             <button
               key={ch.id}
@@ -294,15 +276,17 @@ function TocPanel({ chapters, currentChapter, onClose, onNavigate }: {
   );
 }
 
-/* ── Configurações do leitor ── */
+/* ── Configurações de leitura ── */
 function ReaderSettings({
-  fontSize, onFontSize, lineHeight, onLineHeight,
-  theme, onTheme, font, onFont,
+  fontSize, onFontSize,
+  lineHeight, onLineHeight,
+  theme, onTheme,
+  font, onFont,
 }: {
-  fontSize: number; onFontSize: (n: number) => void;
+  fontSize: number;   onFontSize:   (n: number) => void;
   lineHeight: number; onLineHeight: (n: number) => void;
-  theme: ReaderTheme; onTheme: (t: ReaderTheme) => void;
-  font: ReaderFont; onFont: (f: ReaderFont) => void;
+  theme: ReaderTheme; onTheme:      (t: ReaderTheme) => void;
+  font: ReaderFont;   onFont:       (f: ReaderFont)  => void;
 }) {
   return (
     <div className="space-y-4 w-64 p-1">
@@ -341,10 +325,10 @@ function ReaderSettings({
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Fundo</p>
         <div className="flex gap-2">
           {([
-            { key: "dark",  label: "Escuro", bg: "bg-[#0f1117]", text: "text-white"      },
-            { key: "sepia", label: "Sépia",  bg: "bg-[#f5ead0]", text: "text-amber-900"  },
-            { key: "light", label: "Claro",  bg: "bg-white",     text: "text-gray-900"   },
-          ] as const).map(({ key, label, bg, text }) => (
+            { key: "dark"  as const, label: "Escuro", bg: "bg-[#0f1117]", text: "text-white"     },
+            { key: "sepia" as const, label: "Sépia",  bg: "bg-[#f5ead0]", text: "text-amber-900" },
+            { key: "light" as const, label: "Claro",  bg: "bg-white",     text: "text-gray-900"  },
+          ]).map(({ key, label, bg, text }) => (
             <button
               key={key}
               onClick={() => onTheme(key)}
@@ -361,49 +345,31 @@ function ReaderSettings({
   );
 }
 
-/* ── Hook de busca de vozes ── */
-function useVoices() {
-  const [voices, setVoices] = useState<Voice[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
-    fetch(`${base}/api/tts/voices`)
-      .then((r) => r.json())
-      .then((data: Voice[]) => setVoices(data))
-      .catch(() => setVoices([]))
-      .finally(() => setLoading(false));
-  }, []);
-  return { voices, loading };
-}
-
-/* ── Leitor principal ── */
+/* ── Página do Leitor ── */
 export default function ReaderPage({ params }: { params: { id: string; num: string } }) {
-  const bookId = parseInt(params.id, 10);
+  const bookId        = parseInt(params.id,  10);
   const chapterNumber = parseInt(params.num, 10);
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
+  const queryClient     = useQueryClient();
 
   // Configurações persistidas
-  const [fontSize, setFontSize] = useLocalStorage("reader-font-size", 18);
-  const [lineHeight, setLineHeight] = useLocalStorage("reader-line-height", 1.9);
-  const [theme, setTheme] = useLocalStorage<ReaderTheme>("reader-theme", "dark");
-  const [font, setFont] = useLocalStorage<ReaderFont>("reader-font", "serif");
-  const [voice, setVoice] = useLocalStorage("reader-voice", "pt-BR-FranciscaNeural");
-  const [rate, setRate] = useLocalStorage("reader-rate", 0);
-  const [autoplayEnabled, setAutoplayEnabled] = useLocalStorage("reader-autoplay", false);
+  const [fontSize,   setFontSize  ] = useLocalStorage("reader-font-size",   18);
+  const [lineHeight, setLineHeight] = useLocalStorage("reader-line-height",  1.9);
+  const [theme,      setTheme     ] = useLocalStorage<ReaderTheme>("reader-theme", "dark");
+  const [font,       setFont      ] = useLocalStorage<ReaderFont>("reader-font",   "serif");
+  const [autoplay,   setAutoplay  ] = useLocalStorage("reader-autoplay", false);
 
-  // Estado efêmero de UI
-  const [showSummary, setShowSummary] = useState(false);
-  const [showToc, setShowToc] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [cinematicMode, setCinematicMode] = useState(false);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  // Estado de UI
+  const [showSummary,   setShowSummary  ] = useState(false);
+  const [showToc,       setShowToc      ] = useState(false);
+  const [showControls,  setShowControls ] = useState(true);
+  const [cinematic,     setCinematic    ] = useState(false);
+  const [isPlaying,     setIsPlaying    ] = useState(false);
+
+  const [currentSentence, setCurrentSentence] = useState(0);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Estado do TTS
-  const [currentSentence, setCurrentSentence] = useState(0);
-  const { voices, loading: voicesLoading } = useVoices();
-
+  // Dados
   const { data: book } = useGetBook(bookId, {
     query: { enabled: !!bookId, queryKey: getGetBookQueryKey(bookId) },
   });
@@ -418,115 +384,71 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   });
   const updateProgress = useUpdateReadingProgress();
 
-  const sentences = useMemo(
-    () => (chapter?.content ? splitSentences(chapter.content) : []),
-    [chapter?.content],
-  );
+  const sentences    = useMemo(() => chapter?.content ? splitSentences(chapter.content) : [], [chapter?.content]);
   const totalChapters = book?.totalChapters ?? 0;
 
-  // Reset do índice de frase ao trocar de capítulo
-  useEffect(() => {
-    setCurrentSentence(0);
-  }, [chapterNumber]);
+  void progress;
 
-  // Salva progresso ao visitar capítulo
+  // Reset ao trocar de capítulo
+  useEffect(() => { setCurrentSentence(0); }, [chapterNumber]);
+
+  // Salva progresso ao visitar
   useEffect(() => {
-    if (bookId && chapterNumber) {
-      updateProgress.mutate(
-        { id: bookId, data: { currentChapter: chapterNumber, characterPosition: 0 } },
-        { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bookId) }) }
-      );
-    }
+    if (!bookId || !chapterNumber) return;
+    updateProgress.mutate(
+      { id: bookId, data: { currentChapter: chapterNumber, characterPosition: 0 } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bookId) }) }
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterNumber, bookId]);
 
-  // Auto-ocultar controles
+  // Auto-ocultar controles após inatividade
   const showControlsTemp = useCallback(() => {
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
     controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
   }, []);
 
-  // Scroll da frase atual para a view
+  // Scroll da frase ativa para o centro da tela
   const sentenceRefs = useRef<(HTMLSpanElement | null)[]>([]);
   useEffect(() => {
-    const el = sentenceRefs.current[currentSentence];
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    sentenceRefs.current[currentSentence]?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentSentence]);
 
-  // Autoplay: vai ao próximo capítulo ao terminar o atual
-  const goTo = useCallback((num: number) => {
-    setLocation(`/read/${bookId}/chapter/${num}`);
-  }, [bookId, setLocation]);
+  const goTo = useCallback((num: number) => setLocation(`/read/${bookId}/chapter/${num}`), [bookId, setLocation]);
 
   const handleChapterComplete = useCallback(() => {
-    if (autoplayEnabled && chapterNumber < totalChapters) {
-      goTo(chapterNumber + 1);
-    }
-  }, [autoplayEnabled, chapterNumber, totalChapters, goTo]);
+    if (autoplay && chapterNumber < totalChapters) goTo(chapterNumber + 1);
+  }, [autoplay, chapterNumber, totalChapters, goTo]);
 
-  // ── Atalhos de teclado ──
+  // Atalhos de teclado
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
 
       if (e.key === " " || e.code === "Space") {
         e.preventDefault();
-        const btn = document.querySelector<HTMLElement>(
-          '[data-testid="btn-pause"], [data-testid="btn-play"]'
-        );
-        btn?.click();
+        document.querySelector<HTMLElement>('[data-testid="btn-pause"], [data-testid="btn-play"]')?.click();
         return;
       }
-      if (e.key === "ArrowRight" && e.shiftKey) {
-        e.preventDefault();
-        if (chapterNumber < totalChapters) goTo(chapterNumber + 1);
-        return;
-      }
-      if (e.key === "ArrowLeft" && e.shiftKey) {
-        e.preventDefault();
-        if (chapterNumber > 1) goTo(chapterNumber - 1);
-        return;
-      }
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        document.querySelector<HTMLElement>('[data-testid="btn-skip-forward"]')?.click();
-        return;
-      }
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        document.querySelector<HTMLElement>('[data-testid="btn-skip-back"]')?.click();
-        return;
-      }
-      if (e.key === "Escape") {
-        setShowSummary(false);
-        setShowToc(false);
-        return;
-      }
-      if (e.key === "c" || e.key === "C") {
-        setCinematicMode((v) => !v);
-        return;
-      }
-      if (e.key === "t" || e.key === "T") {
-        setShowToc((v) => !v);
-        return;
-      }
-      if (e.key === "a" || e.key === "A") {
-        setAutoplayEnabled(!autoplayEnabled);
-        return;
-      }
+      if (e.shiftKey && e.key === "ArrowRight") { e.preventDefault(); if (chapterNumber < totalChapters) goTo(chapterNumber + 1); return; }
+      if (e.shiftKey && e.key === "ArrowLeft")  { e.preventDefault(); if (chapterNumber > 1) goTo(chapterNumber - 1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); document.querySelector<HTMLElement>('[data-testid="btn-skip-forward"]')?.click(); return; }
+      if (e.key === "ArrowLeft")  { e.preventDefault(); document.querySelector<HTMLElement>('[data-testid="btn-skip-back"]')?.click(); return; }
+      if (e.key === "Escape") { setShowSummary(false); setShowToc(false); return; }
+      if (e.key === "c" || e.key === "C") { setCinematic((v) => !v); return; }
+      if (e.key === "t" || e.key === "T") { setShowToc((v) => !v); return; }
+      if (e.key === "a" || e.key === "A") { setAutoplay(!autoplay); return; }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [chapterNumber, totalChapters, goTo, autoplayEnabled, setAutoplayEnabled]);
+  }, [chapterNumber, totalChapters, goTo, autoplay, setAutoplay]);
 
-  const bgClass = THEME_BG[theme];
-  const themeClass = THEME_CLASSES[theme];
-  const fontClass = font === "serif" ? "font-serif" : "font-sans";
-  const dimInactive = cinematicMode && isAudioPlaying;
-
-  void progress;
+  const bgClass    = THEME_BG[theme];
+  const themeClass = THEME_CLASS[theme];
+  const fontClass  = font === "serif" ? "font-serif" : "font-sans";
+  const dimInactive = cinematic && isPlaying;
 
   return (
     <div
@@ -555,9 +477,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
           >
             <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
-                <Link href={`/book/${bookId}`} data-testid="btn-back">
-                  <ArrowLeft className="w-4 h-4" />
-                </Link>
+                <Link href={`/book/${bookId}`} data-testid="btn-back"><ArrowLeft className="w-4 h-4" /></Link>
               </Button>
 
               <div className="flex-1 min-w-0 text-center">
@@ -579,8 +499,8 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 </Button>
                 <Button
                   variant="ghost" size="icon"
-                  className={`h-8 w-8 ${cinematicMode ? "text-primary bg-primary/10" : ""}`}
-                  onClick={() => setCinematicMode((v) => !v)}
+                  className={`h-8 w-8 ${cinematic ? "text-primary bg-primary/10" : ""}`}
+                  onClick={() => setCinematic((v) => !v)}
                   title="Modo Cinemático (C)"
                   data-testid="btn-cinematic"
                 >
@@ -588,9 +508,9 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 </Button>
                 <Button
                   variant="ghost" size="icon"
-                  className={`h-8 w-8 ${autoplayEnabled ? "text-primary bg-primary/10" : ""}`}
-                  onClick={() => setAutoplayEnabled(!autoplayEnabled)}
-                  title={autoplayEnabled ? "Autoplay ativado (A)" : "Autoplay desativado (A)"}
+                  className={`h-8 w-8 ${autoplay ? "text-primary bg-primary/10" : ""}`}
+                  onClick={() => setAutoplay(!autoplay)}
+                  title={autoplay ? "Autoplay ativado (A)" : "Autoplay desativado (A)"}
                   data-testid="btn-autoplay"
                 >
                   <Repeat className="w-4 h-4" />
@@ -603,10 +523,10 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-auto p-3">
                     <ReaderSettings
-                      fontSize={fontSize} onFontSize={setFontSize}
+                      fontSize={fontSize}   onFontSize={setFontSize}
                       lineHeight={lineHeight} onLineHeight={setLineHeight}
-                      theme={theme} onTheme={setTheme}
-                      font={font} onFont={setFont}
+                      theme={theme}         onTheme={setTheme}
+                      font={font}           onFont={setFont}
                     />
                   </PopoverContent>
                 </Popover>
@@ -619,15 +539,13 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 >
                   <Sparkles className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="Perguntar à IA">
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                   <Link href={`/book/${bookId}/ask`}>
                     <MessageSquare className="w-4 h-4" />
                   </Link>
                 </Button>
               </div>
             </div>
-
-            {/* Barra de atalhos */}
             <div className="max-w-3xl mx-auto px-4 pb-2">
               <p className="text-[10px] text-muted-foreground/50 text-center">
                 Espaço: play/pause · ←/→: frase · Shift+←/→: capítulo · T: índice · C: cinemático · A: autoplay · Esc: fechar
@@ -637,13 +555,11 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         )}
       </AnimatePresence>
 
-      {/* Navegação lateral — capítulo anterior */}
+      {/* Navegação lateral */}
       <AnimatePresence>
         {showControls && chapterNumber > 1 && (
           <motion.button
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
             onClick={() => goTo(chapterNumber - 1)}
             className="fixed left-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-card/80 border border-border backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-all"
             title="Capítulo anterior (Shift+←)"
@@ -652,14 +568,10 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
           </motion.button>
         )}
       </AnimatePresence>
-
-      {/* Navegação lateral — próximo capítulo */}
       <AnimatePresence>
         {showControls && chapterNumber < totalChapters && (
           <motion.button
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
             onClick={() => goTo(chapterNumber + 1)}
             className="fixed right-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-card/80 border border-border backdrop-blur-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-all"
             title="Próximo capítulo (Shift+→)"
@@ -669,9 +581,8 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         )}
       </AnimatePresence>
 
-      {/* Conteúdo principal */}
+      {/* Conteúdo */}
       <div className="max-w-3xl mx-auto px-6 pt-28 pb-48">
-        {/* Contador de capítulo */}
         <div className="text-center mb-8">
           <span className="text-xs font-mono text-muted-foreground bg-secondary px-3 py-1 rounded-full">
             {chapterNumber} / {totalChapters}
@@ -692,25 +603,19 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
             <p className="text-center text-xs text-muted-foreground mb-10">
               {chapter.wordCount.toLocaleString("pt-BR")} palavras · {readingTime(chapter.wordCount)}
             </p>
-
-            <div
-              className={`leading-relaxed ${fontClass}`}
-              style={{ fontSize: `${fontSize}px`, lineHeight }}
-            >
+            <div className={`leading-relaxed ${fontClass}`} style={{ fontSize: `${fontSize}px`, lineHeight }}>
               {sentences.map((sentence, idx) => {
                 const isActive = idx === currentSentence;
-                const isPast = idx < currentSentence;
+                const isPast   = idx < currentSentence;
                 return (
                   <span
                     key={idx}
                     ref={(el) => { sentenceRefs.current[idx] = el; }}
                     onClick={() => setCurrentSentence(idx)}
                     className={`cursor-pointer transition-all duration-200 ${
-                      isActive
-                        ? "text-foreground bg-primary/15 rounded px-0.5"
-                        : isPast
-                        ? dimInactive ? "opacity-20 text-muted-foreground" : "text-muted-foreground"
-                        : dimInactive ? "opacity-30" : "text-foreground/90"
+                      isActive  ? "text-foreground bg-primary/15 rounded px-0.5"
+                      : isPast  ? (dimInactive ? "opacity-20 text-muted-foreground" : "text-muted-foreground")
+                      : dimInactive ? "opacity-30" : "text-foreground/90"
                     } hover:text-foreground`}
                   >
                     {sentence}{" "}
@@ -724,13 +629,11 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
         )}
       </div>
 
-      {/* Player de áudio fixo na base */}
+      {/* Player de áudio — simplificado, sem seleção de voz */}
       <AnimatePresence>
         {showControls && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.18 }}
             className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 px-4 py-4"
             style={{ background: "rgba(15,17,23,0.96)", backdropFilter: "blur(12px)" }}
@@ -740,15 +643,9 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
                 sentences={sentences}
                 currentIdx={currentSentence}
                 onSentenceChange={setCurrentSentence}
-                voice={voice}
-                rate={rate}
-                onVoiceChange={setVoice}
-                onRateChange={setRate}
-                voices={voices}
-                voicesLoading={voicesLoading}
                 disabled={chapterLoading || !chapter}
-                immersive={cinematicMode}
-                onPlayingChange={setIsAudioPlaying}
+                immersive={cinematic}
+                onPlayingChange={setIsPlaying}
                 onChapterComplete={handleChapterComplete}
               />
             </div>
@@ -759,15 +656,11 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
       {/* Painel de Resumo */}
       <AnimatePresence>
         {showSummary && (
-          <SummaryPanel
-            bookId={bookId}
-            chapterNumber={chapterNumber}
-            onClose={() => setShowSummary(false)}
-          />
+          <SummaryPanel bookId={bookId} chapterNumber={chapterNumber} onClose={() => setShowSummary(false)} />
         )}
       </AnimatePresence>
 
-      {/* Painel de Índice (TOC) */}
+      {/* Painel de Índice */}
       <AnimatePresence>
         {showToc && allChapters && (
           <TocPanel

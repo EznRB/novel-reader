@@ -1,0 +1,112 @@
+O sistema de narração precisa ser reformulado para oferecer uma experiência consistente, intuitiva e de alta qualidade.
+
+### 1. Correção da reprodução de áudio
+
+* Corrija o problema em que a narração é interrompida automaticamente após apenas algumas palavras ou frases.
+* A reprodução deve continuar normalmente até o final do trecho ou capítulo, interrompendo apenas quando o usuário pausar ou encerrar manualmente.
+* Garanta que a reprodução seja estável, sem cortes inesperados ou reinicializações.
+
+### 2. Novo sistema de identificação de personagens
+
+O método atual de identificação de personagens é inadequado, pois muitas vozes são atribuídas aleatoriamente, inclusive para personagens que aparecem apenas uma única vez.
+
+Implemente um sistema inteligente que:
+
+* Analise toda a obra antes da geração das vozes.
+* Identifique automaticamente quais personagens são realmente relevantes.
+* Utilize critérios consistentes, como:
+
+  * quantidade de capítulos em que o personagem aparece;
+  * número total de falas;
+  * frequência de aparições ao longo da obra;
+  * importância na narrativa (quando possível inferir).
+
+Com base nesses critérios, classifique os personagens em três categorias:
+
+### Personagens principais
+
+* Recebem uma voz exclusiva e permanente durante toda a obra.
+* A voz nunca poderá mudar entre capítulos.
+* O número de personagens principais deve ser determinado automaticamente pelo algoritmo, utilizando critérios inteligentes em vez de um número fixo.
+
+### Personagens secundários
+
+* Compartilham uma voz masculina fixa ou uma voz feminina fixa, de acordo com seu gênero.
+* Essas vozes devem permanecer consistentes durante toda a leitura.
+
+### Figurantes e personagens ocasionais
+
+* Também utilizam a voz masculina ou feminina padrão.
+* Não devem receber vozes exclusivas.
+
+Isso evita desperdiçar vozes únicas com personagens irrelevantes e garante consistência para quem realmente participa da história.
+
+### 3. Remover seleção manual de vozes
+
+Remova completamente a interface onde o usuário escolhe vozes.
+
+O processo deve ser totalmente automático.
+
+A aplicação será responsável por:
+
+* escolher a melhor voz para o narrador;
+* identificar automaticamente os personagens principais;
+* atribuir vozes exclusivas aos principais;
+* utilizar as vozes padrão para secundários e figurantes.
+
+O usuário não deve precisar configurar nada relacionado às vozes.
+
+### 4. Narrador fixo
+
+O narrador deve utilizar sempre uma única voz exclusiva.
+
+Essa voz:
+
+* nunca deve mudar;
+* deve ser de alta qualidade;
+* deve possuir excelente naturalidade;
+* deve ser ideal para leituras longas.
+
+### 5. Pesquisa das melhores IAs de voz
+
+Pesquise quais são atualmente os melhores modelos gratuitos de Text-to-Speech compatíveis com a API NVIDIA fornecida no projeto.
+
+Considere fatores como:
+
+* naturalidade;
+* expressividade;
+* estabilidade;
+* velocidade;
+* qualidade da pronúncia;
+* suporte ao idioma português;
+* baixo tempo de resposta;
+* facilidade de integração.
+
+Caso exista um modelo superior ao atualmente utilizado, substitua-o pela melhor opção disponível.
+
+### 6. Experiência do usuário
+
+Todo o fluxo deve ser extremamente simples.
+
+O usuário deverá conseguir:
+
+* importar um livro;
+* iniciar a leitura.
+
+Todo o restante deverá acontecer automaticamente.
+
+Evite telas de configuração desnecessárias, menus complexos e opções técnicas.
+
+A experiência deve ser intuitiva e exigir o menor número possível de cliques.
+
+### 7. Robustez da implementação
+
+A implementação deve priorizar:
+
+* estabilidade;
+* consistência entre capítulos;
+* facilidade de manutenção;
+* desempenho;
+* escalabilidade para obras longas.
+
+Antes de concluir a implementação, revise toda a lógica para eliminar possíveis inconsistências, especialmente em relação à identificação de personagens, atribuição de vozes e reprodução contínua do áudio.

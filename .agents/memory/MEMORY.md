@@ -1,2 +1,4 @@
 - [AudioPlayer ref pattern](audio-player-ref-pattern.md) — Audio element must be created once (empty deps); use prop refs to avoid stuck-loading bug from cascading useCallback deps.
 - [useLocalStorage setter type](uselocalstorage-setter.md) — The useLocalStorage hook returns (v: T) => void, NOT a React state setter; never pass functional updaters like (v) => !v; use the current value directly.
+- [TTS audio stopping fix](tts-audio-buffer-fix.md) — msedge-tts streaming causes premature audio end in browser; fix by collecting full buffer before sending (with Content-Length) + canplaythrough wait before play().
+- [Character voice tier system](character-voice-tiers.md) — 3-tier voice assignment: main (protagonist/antagonist)=unique voice from pool, secondary/extra=shared DEFAULT_MALE/DEFAULT_FEMALE. Narrator (pt-BR-AntonioNeural) is NEVER assigned to characters.

@@ -1,38 +1,31 @@
 /**
- * AudioPlayer
+ * AudioPlayer — Sistema de narração automático
  *
- * Architecture notes:
- * - The HTMLAudioElement is created ONCE on mount (empty deps in useEffect).
- * - All prop values that change over time are mirrored into refs so stable
- *   callbacks can always read the latest value without becoming dependencies.
- * - This prevents the "Audio recreated mid-play → shouldPlayRef reset → stuck
- *   on loading" bug that occurred when sentences/voice/rate changed.
+ * - Sem seleção manual de voz: tudo é automático
+ * - Voz do narrador fixa (pt-BR-AntonioNeural)
+ * - Vozes de personagens atribuídas automaticamente pelo backend
+ * - Áudio coletado como buffer completo antes de tocar (corrige paradas prematuras)
+ * - Pré-carrega a próxima frase durante a reprodução atual
+ *
+ * Notas de arquitetura:
+ * - HTMLAudioElement criado UMA VEZ no mount (deps vazias)
+ * - Props atualizadas via refs para evitar fechamentos obsoletos
+ * - Nunca recria o elemento Audio durante a reprodução
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Play, Pause, Square, SkipBack, SkipForward,
-  Volume2, Loader2, Sparkles,
+  Loader2, Sparkles, Gauge,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 
-/* ── Types ── */
-export interface Voice {
-  Name: string;
-  ShortName: string;
-  Gender: string;
-  Locale: string;
-  FriendlyName: string;
-}
-
+/* ── Tipos ── */
 export type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
 type VoiceStyle =
-  | "narration" | "cheerful" | "sad"
-  | "excited"  | "angry"   | "whisper" | "dialogue";
+  | "narration" | "dialogue" | "cheerful" | "sad"
+  | "excited"   | "angry"   | "whisper";
 
 const STYLE_LABELS: Record<VoiceStyle, string> = {
   narration: "Narrando",
@@ -54,36 +47,27 @@ const STYLE_COLORS: Record<VoiceStyle, string> = {
   whisper:   "text-violet-400",
 };
 
-/* ── Detecção de entonação (pt-BR + EN) ── */
+/* ── Detecção de estilo para modo cinemático (pt-BR + EN) ── */
 function detectStyle(text: string): VoiceStyle {
   const s = text.trim();
 
-  // Diálogo — aspas de qualquer tipo
   if (/[""\u201C\u201D\u2018\u2019'']/.test(s)) return "dialogue";
   if (s.endsWith("?") && s.length < 100) return "dialogue";
 
-  // Exclamação — distingue raiva de empolgação
   if (s.endsWith("!")) {
-    const angry = /\b(nunca|morra|morra|mata|destrua|idiota|covarde|traidor|maldito|basta|como ousa|impossível|ouse|insolente|never|die|kill|destroy|fool|idiot|coward|traitor|damn|enough|how dare|impossible)\b/i;
+    const angry = /\b(nunca|morra|mata|destrua|idiota|covarde|traidor|maldito|basta|como ousa|impossível|never|die|kill|destroy|fool|coward|traitor|damn|enough|how dare)\b/i;
     return angry.test(s) ? "angry" : "excited";
   }
 
-  // Tristeza / pesar
-  if (/\b(morr(eu|eu)|morte|mort(o|a)|perdi|perdeu|lágrima|chorou|chorava|dor|saudade|sozinho|sozinha|sofrimento|tristeza|desespero|angústia|pranto|lamentou|luto|lamentação|died?|death|dead|lost|grief|tear|wept?|cried?|sorrow|pain|heartbreak|alone|lonely|miss|gone forever|helpless|hopeless|despair|mourn|suffer|agony|anguish)\b/i.test(s)) return "sad";
-
-  // Terror / ameaça / sombra
-  if (/\b(terror|medo|assustou|tremeu|tremia|monstro|demônio|ameaça|perigo|fugiu|fuga|sombra|trevas|arrepio|espectro|fantasma|terrif|horror|fear|afraid|trembl|shiver|monster|demon|threaten|danger|flee|escape|alarm|shadow|darkness|chill|ghostly)\b/i.test(s)) return "angry";
-
-  // Combate / ação intensa
-  if (/\b(atacou|atacar|lutou|luta|batalha|combate|golpe|explosão|explodiu|sangue|ferido|ferimento|esmagou|cortou|perfurou|vitória|derrotou|rasgou|colidiu|attack|fight|battle|clash|rush|charge|explo|shatter|slash|pierce|struck|blood|wound|combat|crush|defeat|sword|punch|blade|burst|collide)\b/i.test(s)) return "excited";
-
-  // Sussurro / segredo
-  if (/\b(sussurrou|sussurrava|segredo|discretamente|sigiloso|baixinho|whisper|murmur|quietly|secret)\b/i.test(s)) return "whisper";
+  if (/\b(morreu|morte|morto|perdi|perdeu|lágrima|chorou|dor|saudade|sozinho|sofrimento|tristeza|desespero|angústia|died?|death|lost|grief|tear|wept?|sorrow|pain|alone|despair)\b/i.test(s)) return "sad";
+  if (/\b(terror|medo|tremeu|monstro|demônio|ameaça|perigo|sombra|trevas|arrepio|fear|afraid|trembl|monster|demon|danger|shadow|chill)\b/i.test(s)) return "angry";
+  if (/\b(atacou|lutou|batalha|combate|explosão|sangue|ferido|vitória|attack|fight|battle|explo|blood|wound|combat)\b/i.test(s)) return "excited";
+  if (/\b(sussurrou|segredo|discretamente|sigiloso|whisper|murmur|quietly|secret)\b/i.test(s)) return "whisper";
 
   return "narration";
 }
 
-/* ── Waveform animation ── */
+/* ── Animação de onda ── */
 function WaveformViz() {
   return (
     <div className="flex items-end gap-0.5 h-5" aria-hidden>
@@ -99,72 +83,64 @@ export interface AudioPlayerProps {
   sentences: string[];
   currentIdx: number;
   onSentenceChange: (idx: number) => void;
-  voice: string;
-  rate: number;
-  onVoiceChange: (v: string) => void;
-  onRateChange: (r: number) => void;
-  voices: Voice[];
-  voicesLoading: boolean;
+  /** Voz para usar (padrão: pt-BR-AntonioNeural do narrador) */
+  voice?: string;
   disabled?: boolean;
   immersive?: boolean;
   onPlayingChange?: (playing: boolean) => void;
-  /** Chamado quando a última frase do capítulo termina de tocar */
   onChapterComplete?: () => void;
 }
 
-/* ── Component ── */
+const NARRATOR_VOICE = "pt-BR-AntonioNeural";
+
+/* ── Componente ── */
 export function AudioPlayer({
   sentences,
   currentIdx,
   onSentenceChange,
-  voice,
-  rate,
-  onVoiceChange,
-  onRateChange,
-  voices,
-  voicesLoading,
+  voice = NARRATOR_VOICE,
   disabled,
   immersive = false,
   onPlayingChange,
   onChapterComplete,
 }: AudioPlayerProps) {
-  const [status, setStatus]           = useState<PlayerStatus>("idle");
+  const [status, setStatus]             = useState<PlayerStatus>("idle");
   const [currentStyle, setCurrentStyle] = useState<VoiceStyle>("narration");
+  const [rate, setRate]                 = useState(0); // velocidade em %
 
-  /* ── Stable refs for props (updated every render — no stale closures) ── */
-  const sentencesRef           = useRef(sentences);
-  const voiceRef               = useRef(voice);
-  const rateRef                = useRef(rate);
-  const immersiveRef           = useRef(immersive);
-  const onSentenceChangeRef    = useRef(onSentenceChange);
-  const onChapterCompleteRef   = useRef(onChapterComplete);
-  sentencesRef.current           = sentences;
-  voiceRef.current               = voice;
-  rateRef.current                = rate;
-  immersiveRef.current           = immersive;
-  onSentenceChangeRef.current    = onSentenceChange;
-  onChapterCompleteRef.current   = onChapterComplete;
+  /* ── Refs estáveis — atualizados a cada render, nunca obsoletos ── */
+  const sentencesRef         = useRef(sentences);
+  const voiceRef             = useRef(voice);
+  const rateRef              = useRef(rate);
+  const immersiveRef         = useRef(immersive);
+  const onSentenceChangeRef  = useRef(onSentenceChange);
+  const onChapterCompleteRef = useRef(onChapterComplete);
+  sentencesRef.current         = sentences;
+  voiceRef.current             = voice;
+  rateRef.current              = rate;
+  immersiveRef.current         = immersive;
+  onSentenceChangeRef.current  = onSentenceChange;
+  onChapterCompleteRef.current = onChapterComplete;
 
-  /* ── Playback state refs ── */
-  const audioRef         = useRef<HTMLAudioElement | null>(null);
-  const shouldPlayRef    = useRef(false);
-  const playingIdxRef    = useRef(-1);
-  const currentUrlRef    = useRef<string | null>(null);
-  const prefetchUrlRef   = useRef<string | null>(null);
-  const prefetchIdxRef   = useRef(-1);
+  /* ── Refs de reprodução ── */
+  const audioRef       = useRef<HTMLAudioElement | null>(null);
+  const shouldPlayRef  = useRef(false);
+  const playingIdxRef  = useRef(-1);
+  const currentUrlRef  = useRef<string | null>(null);
+  const prefetchUrlRef = useRef<string | null>(null);
+  const prefetchIdxRef = useRef(-1);
+  const prefetchVoiceRef = useRef(NARRATOR_VOICE);
   const prefetchStyleRef = useRef("narration");
 
-  /* ── Ref used by the stable onEnded handler to call playSentence ── */
   const playSentenceRef = useRef<(idx: number) => void>(() => {});
 
   const revokeUrl = (url: string | null) => { if (url) URL.revokeObjectURL(url); };
 
-  /* ── Notify parent of play state ── */
   useEffect(() => {
     onPlayingChange?.(status === "playing");
   }, [status, onPlayingChange]);
 
-  /* ── Create HTMLAudioElement exactly once ── */
+  /* ── Cria HTMLAudioElement apenas uma vez ── */
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
@@ -183,7 +159,9 @@ export function AudioPlayer({
       }
     };
 
-    const onError = () => {
+    const onError = (e: Event) => {
+      // Ignora erros quando o src está vazio (limpeza normal)
+      if ((e.target as HTMLAudioElement).src === "" || (e.target as HTMLAudioElement).src === window.location.href) return;
       if (shouldPlayRef.current) setStatus("error");
     };
 
@@ -193,41 +171,40 @@ export function AudioPlayer({
     return () => {
       shouldPlayRef.current = false;
       audio.pause();
-      audio.src = "";
+      audio.removeAttribute("src");
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       revokeUrl(currentUrlRef.current);
       revokeUrl(prefetchUrlRef.current);
     };
-  }, []); // ← empty: Audio lives for the component lifetime
+  }, []);
 
-  /* ── Fetch audio blob (stable — reads voice/rate from refs) ── */
-  const fetchAudio = useCallback(async (text: string, style: string): Promise<string> => {
+  /* ── Busca áudio como buffer completo (resolve paradas prematuras) ── */
+  const fetchAudio = useCallback(async (text: string, style: string, v: string): Promise<string> => {
     const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
     const res = await fetch(`${base}/api/tts/synthesize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: text.trim(),
-        voice: voiceRef.current,
+        text:  text.trim(),
+        voice: v,
         rate:  rateRef.current,
         style,
       }),
     });
-    if (!res.ok) {
-      const msg = await res.text().catch(() => res.statusText);
-      throw new Error(`TTS ${res.status}: ${msg}`);
-    }
+    if (!res.ok) throw new Error(`TTS ${res.status}`);
     const blob = await res.blob();
+    if (blob.size === 0) throw new Error("Áudio vazio recebido");
     return URL.createObjectURL(blob);
-  }, []); // stable
+  }, []);
 
-  /* ── Stop playback ── */
+  /* ── Para tudo ── */
   const stopAudio = useCallback(() => {
     shouldPlayRef.current = false;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
     }
     revokeUrl(currentUrlRef.current);
     revokeUrl(prefetchUrlRef.current);
@@ -237,29 +214,32 @@ export function AudioPlayer({
     playingIdxRef.current  = -1;
     setStatus("idle");
     setCurrentStyle("narration");
-  }, []); // stable
+  }, []);
 
-  /* ── Prefetch next sentence ── */
+  /* ── Pré-carrega próxima frase ── */
   const prefetchNext = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
+    const v     = voiceRef.current;
     if (idx >= sents.length || !sents[idx]?.trim()) return;
     const style = immersiveRef.current ? detectStyle(sents[idx]) : "narration";
-    if (prefetchIdxRef.current === idx && prefetchStyleRef.current === style && prefetchUrlRef.current) return;
+    if (prefetchIdxRef.current === idx && prefetchVoiceRef.current === v && prefetchStyleRef.current === style && prefetchUrlRef.current) return;
     prefetchIdxRef.current   = idx;
+    prefetchVoiceRef.current = v;
     prefetchStyleRef.current = style;
     try {
-      const url = await fetchAudio(sents[idx], style);
+      const url = await fetchAudio(sents[idx], style, v);
       revokeUrl(prefetchUrlRef.current);
       prefetchUrlRef.current = url;
     } catch {
       prefetchUrlRef.current = null;
       prefetchIdxRef.current = -1;
     }
-  }, [fetchAudio]); // stable
+  }, [fetchAudio]);
 
-  /* ── Play a specific sentence ── */
+  /* ── Toca uma frase específica ── */
   const playSentence = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
+    const v     = voiceRef.current;
     if (idx >= sents.length || !sents[idx]?.trim()) {
       stopAudio();
       return;
@@ -274,8 +254,10 @@ export function AudioPlayer({
     try {
       let url: string;
 
+      // Usa pré-carregamento se disponível e ainda válido
       if (
         prefetchIdxRef.current   === idx &&
+        prefetchVoiceRef.current === v   &&
         prefetchStyleRef.current === style &&
         prefetchUrlRef.current
       ) {
@@ -283,7 +265,7 @@ export function AudioPlayer({
         prefetchUrlRef.current = null;
         prefetchIdxRef.current = -1;
       } else {
-        url = await fetchAudio(sents[idx], style);
+        url = await fetchAudio(sents[idx], style, v);
       }
 
       if (!shouldPlayRef.current) {
@@ -297,24 +279,46 @@ export function AudioPlayer({
 
       const audio = audioRef.current!;
       audio.src = url;
-      audio.load();
+
+      // Aguarda carregamento completo antes de tocar (evita paradas prematuras)
+      await new Promise<void>((resolve, reject) => {
+        const onReady = () => { cleanup(); resolve(); };
+        const onErr   = () => { cleanup(); reject(new Error("Falha no carregamento")); };
+        const cleanup = () => {
+          audio.removeEventListener("canplaythrough", onReady);
+          audio.removeEventListener("error", onErr);
+        };
+        audio.addEventListener("canplaythrough", onReady, { once: true });
+        audio.addEventListener("error", onErr, { once: true });
+        audio.load();
+      });
+
+      if (!shouldPlayRef.current) {
+        setStatus("idle");
+        return;
+      }
+
       await audio.play();
       setStatus("playing");
 
+      // Pré-carrega a próxima frase enquanto esta toca
       prefetchNext(idx + 1);
 
     } catch (err) {
-      console.error("[AudioPlayer] playback error:", err);
-      setStatus(shouldPlayRef.current ? "error" : "idle");
+      console.error("[AudioPlayer] erro de reprodução:", err);
+      if (shouldPlayRef.current) {
+        setStatus("error");
+      } else {
+        setStatus("idle");
+      }
     }
-  }, [fetchAudio, stopAudio, prefetchNext]); // stable
+  }, [fetchAudio, stopAudio, prefetchNext]);
 
-  /* ── Keep playSentenceRef in sync ── */
   useEffect(() => {
     playSentenceRef.current = playSentence;
   }, [playSentence]);
 
-  /* ── Public controls ── */
+  /* ── Controles públicos ── */
   const play = useCallback(() => {
     shouldPlayRef.current = true;
     playSentenceRef.current(currentIdx);
@@ -329,7 +333,7 @@ export function AudioPlayer({
   const resume = useCallback(() => {
     shouldPlayRef.current = true;
     const audio = audioRef.current;
-    if (audio && audio.src && status === "paused") {
+    if (audio && audio.src && audio.src !== window.location.href && status === "paused") {
       audio.play()
         .then(() => setStatus("playing"))
         .catch(() => { shouldPlayRef.current = true; playSentenceRef.current(currentIdx); });
@@ -340,40 +344,41 @@ export function AudioPlayer({
 
   const skipBack = useCallback(() => {
     const newIdx = Math.max(0, currentIdx - 1);
-    if (shouldPlayRef.current) {
-      playSentenceRef.current(newIdx);
-    } else {
-      onSentenceChangeRef.current(newIdx);
-    }
+    if (shouldPlayRef.current) playSentenceRef.current(newIdx);
+    else onSentenceChangeRef.current(newIdx);
   }, [currentIdx]);
 
   const skipForward = useCallback(() => {
     const newIdx = Math.min(sentences.length - 1, currentIdx + 1);
-    if (shouldPlayRef.current) {
-      playSentenceRef.current(newIdx);
-    } else {
-      onSentenceChangeRef.current(newIdx);
-    }
+    if (shouldPlayRef.current) playSentenceRef.current(newIdx);
+    else onSentenceChangeRef.current(newIdx);
   }, [currentIdx, sentences.length]);
+
+  // Para reprodução ao trocar de velocidade
+  const handleRateChange = useCallback((newRate: number) => {
+    setRate(newRate);
+    if (shouldPlayRef.current) stopAudio();
+  }, [stopAudio]);
 
   const isPlaying = status === "playing";
   const isLoading = status === "loading";
 
-  // Prioriza vozes pt-BR, depois outros idiomas
-  const ptBRVoices  = voices.filter((v) => v.Locale.startsWith("pt-BR") || v.Locale.startsWith("pt-PT"));
-  const otherVoices = voices.filter((v) => !v.Locale.startsWith("pt-"));
+  const progressPct = useMemo(
+    () => ((currentIdx + 1) / Math.max(1, sentences.length)) * 100,
+    [currentIdx, sentences.length],
+  );
 
   return (
     <div className="flex flex-col gap-3 w-full">
       {/* Barra de progresso */}
       <div className="flex items-center gap-3">
-        <span className="text-xs font-mono text-muted-foreground w-16 shrink-0">
+        <span className="text-xs font-mono text-muted-foreground w-16 shrink-0 tabular-nums">
           {currentIdx + 1} / {sentences.length}
         </span>
         <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
           <div
             className="progress-bar-fill transition-all duration-300"
-            style={{ width: `${((currentIdx + 1) / Math.max(1, sentences.length)) * 100}%` }}
+            style={{ width: `${progressPct}%` }}
           />
         </div>
         {immersive && isPlaying && (
@@ -386,6 +391,7 @@ export function AudioPlayer({
 
       {/* Controles */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
+        {/* Play/Pause/Skip */}
         <div className="flex items-center gap-2">
           <Button
             variant="ghost" size="icon"
@@ -444,70 +450,25 @@ export function AudioPlayer({
           {isPlaying && <WaveformViz />}
         </div>
 
-        {/* Velocidade + seletor de voz */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2 min-w-[160px]">
-            <Volume2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <Slider
-              value={[rate]}
-              min={-50} max={50} step={5}
-              onValueChange={([v]) => { onRateChange(v); if (isPlaying) stopAudio(); }}
-              className="w-28"
-              data-testid="slider-rate"
-            />
-            <span className="text-xs text-muted-foreground w-12 shrink-0 font-mono">
-              {rate > 0 ? "+" : ""}{rate}%
-            </span>
-          </div>
-
-          {!voicesLoading && voices.length > 0 && (
-            <Select
-              value={voice}
-              onValueChange={(v) => { onVoiceChange(v); if (isPlaying) stopAudio(); }}
-            >
-              <SelectTrigger className="h-8 text-xs w-52 bg-secondary border-border" data-testid="select-voice">
-                <SelectValue placeholder="Selecionar voz" />
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                {ptBRVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs text-muted-foreground font-semibold uppercase tracking-wide">
-                      Português (Brasil)
-                    </div>
-                    {ptBRVoices.slice(0, 20).map((v) => (
-                      <SelectItem key={v.ShortName} value={v.ShortName} className="text-xs">
-                        {v.FriendlyName}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-                {otherVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs text-muted-foreground font-semibold uppercase tracking-wide mt-1">
-                      Outros Idiomas
-                    </div>
-                    {otherVoices.slice(0, 20).map((v) => (
-                      <SelectItem key={v.ShortName} value={v.ShortName} className="text-xs">
-                        {v.FriendlyName}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
-          )}
-
-          {voicesLoading && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin" /> Carregando vozes…
-            </span>
-          )}
+        {/* Controle de velocidade */}
+        <div className="flex items-center gap-2">
+          <Gauge className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <Slider
+            value={[rate]}
+            min={-50} max={50} step={5}
+            onValueChange={([v]) => handleRateChange(v)}
+            className="w-24"
+            data-testid="slider-rate"
+          />
+          <span className="text-xs text-muted-foreground w-12 font-mono tabular-nums">
+            {rate > 0 ? "+" : ""}{rate}%
+          </span>
         </div>
       </div>
 
       {status === "error" && (
         <p className="text-xs text-destructive">
-          Erro de áudio — verifique sua conexão e tente novamente.
+          Falha no áudio — verifique sua conexão e tente novamente.
         </p>
       )}
     </div>

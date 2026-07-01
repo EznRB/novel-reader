@@ -10,28 +10,28 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// Vozes Microsoft Edge pt-BR para personagens masculinos
-const MALE_VOICES = [
-  "pt-BR-AntonioNeural",    // protagonista masculino — neutro e claro
-  "pt-BR-DonatoNeural",     // antagonista — grave e sério
-  "pt-BR-FabioNeural",      // personagem de apoio
-  "pt-BR-FranciscoNeural",  // personagem jovem
-  "pt-BR-HumbertoNeural",   // personagem veterano/idoso
-  "pt-BR-JulioNeural",      // personagem secundário
-];
+// ──────────────────────────────────────────────────────
+//  Sistema de vozes pt-BR — 3 camadas de personagens
+// ──────────────────────────────────────────────────────
 
-// Vozes Microsoft Edge pt-BR para personagens femininas
-const FEMALE_VOICES = [
-  "pt-BR-FranciscaNeural",  // protagonista feminina — neutra e clara
-  "pt-BR-BrendaNeural",     // personagem de apoio
-  "pt-BR-ElzaNeural",       // personagem veterana/séria
-  "pt-BR-GiovannaNeural",   // personagem jovem e animada
-  "pt-BR-LeticiaNeural",    // personagem misteriosa
-  "pt-BR-ManuelaNeural",    // personagem secundária
-];
-
-// Voz fixa do narrador
+/** Voz exclusiva do narrador — nunca atribuída a personagens */
 const NARRATOR_VOICE = "pt-BR-AntonioNeural";
+
+/**
+ * Pool de vozes únicas para PERSONAGENS PRINCIPAIS.
+ * Cada personagem principal recebe uma voz exclusiva e permanente.
+ * Protagonistas/antagonistas recebem vozes desse pool.
+ */
+const MAIN_MALE_VOICES   = ["pt-BR-DonatoNeural", "pt-BR-FranciscoNeural", "pt-BR-JulioNeural", "pt-BR-HumbertoNeural"];
+const MAIN_FEMALE_VOICES = ["pt-BR-FranciscaNeural", "pt-BR-BrendaNeural", "pt-BR-ElzaNeural", "pt-BR-ManuelaNeural"];
+
+/**
+ * Voz compartilhada para PERSONAGENS SECUNDÁRIOS E FIGURANTES.
+ * Todos os personagens desse tier compartilham uma voz por gênero.
+ */
+const DEFAULT_MALE_VOICE   = "pt-BR-FabioNeural";
+const DEFAULT_FEMALE_VOICE = "pt-BR-GiovannaNeural";
+const DEFAULT_UNKNOWN_VOICE = "pt-BR-FabioNeural";
 
 // GET /books/:id/characters
 router.get("/books/:id/characters", async (req, res): Promise<void> => {
@@ -56,7 +56,7 @@ router.get("/books/:id/characters", async (req, res): Promise<void> => {
   res.json(characters);
 });
 
-// POST /books/:id/characters  (extração via IA)
+// POST /books/:id/characters  (extração via IA com análise toda a obra)
 router.post("/books/:id/characters", async (req, res): Promise<void> => {
   const params = ExtractCharactersParams.safeParse(req.params);
   if (!params.success) {
@@ -83,13 +83,12 @@ router.post("/books/:id/characters", async (req, res): Promise<void> => {
     .where(eq(chaptersTable.bookId, params.data.id))
     .orderBy(chaptersTable.chapterNumber);
 
-  // Estratégia de extração precisa:
-  // - Primeiros 30 capítulos (onde a maioria dos personagens é apresentada): 800 chars cada
-  // - Capítulos 31-60: 400 chars cada
-  // Total: ~20k chars, com marcadores claros de capítulo
+  // Estratégia de orçamento por capítulo para máxima precisão:
+  // - Primeiros 30 capítulos (onde maioria dos personagens é introduzida): 800 chars
+  // - Capítulos 31-60: 400 chars
   const MAX_EARLY = 30;
-  const MAX_TOTAL = 60;
-  const relevantChapters = chapters.filter((c) => c.chapterNumber <= Math.min(upToChapter, MAX_TOTAL));
+  const MAX_TOTAL = Math.min(upToChapter, 60);
+  const relevantChapters = chapters.filter((c) => c.chapterNumber <= MAX_TOTAL);
 
   const combinedText = relevantChapters
     .map((c) => {
@@ -101,24 +100,26 @@ router.post("/books/:id/characters", async (req, res): Promise<void> => {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 1800,
+      max_completion_tokens: 2000,
       messages: [
         {
           role: "system",
-          content: `Você é um analista literário especializado em romances de fantasia e ficção científica. Extraia os personagens nomeados do texto fornecido.
+          content: `Você é um analista literário. Extraia os personagens nomeados do texto.
 
-REGRAS CRÍTICAS:
-1. O campo "firstAppearanceChapter" DEVE ser exatamente o número N do marcador [CAPÍTULO N] onde o personagem aparece pela PRIMEIRA VEZ no texto. Jamais invente números de capítulos que não estão no texto.
-2. Use apenas capítulos presentes no texto fornecido.
-3. Infira o gênero pelos pronomes e pelo contexto (ele/seu/dele = male, ela/sua/dela = female).
-4. Inclua apenas personagens claramente nomeados com papéis significativos.
-5. Responda APENAS com JSON válido, sem markdown.
+REGRAS CRÍTICAS DE CLASSIFICAÇÃO DE PAPEL:
+- "protagonist": APENAS o(a) protagonista principal da história (normalmente 1, raramente 2). É o foco narrativo central.
+- "antagonist": Principais opositores com papel significativo e recorrente (1-3 no máximo).
+- "supporting": Personagens recorrentes que aparecem em múltiplos capítulos com papel ativo na trama.
+- "minor": Todos os demais — mencionados ocasionalmente, aparecem em poucos capítulos, ou têm papel passageiro.
+- "firstAppearanceChapter": EXATAMENTE o número N do marcador [CAPÍTULO N] onde o personagem aparece pela PRIMEIRA VEZ.
 
-Retorne um array JSON com esta estrutura:
+Classifique de forma CONSERVADORA — poucos protagonistas/antagonistas, maioria como supporting/minor.
+
+Retorne APENAS JSON válido sem markdown:
 [
   {
-    "name": "Nome do Personagem",
-    "description": "Descrição de 2-3 frases sobre o personagem, seu papel e personalidade",
+    "name": "Nome",
+    "description": "Papel e personalidade em 2-3 frases",
     "role": "protagonist|antagonist|supporting|minor",
     "gender": "male|female|unknown",
     "firstAppearanceChapter": 1
@@ -156,7 +157,7 @@ Retorne um array JSON com esta estrutura:
           bookId: params.data.id,
           name: c.name,
           description: c.description ?? null,
-          role: c.role ?? null,
+          role: c.role ?? "minor",
           gender: c.gender ?? null,
           firstAppearanceChapter: c.firstAppearanceChapter ?? null,
           assignedVoice: null,
@@ -177,7 +178,7 @@ Retorne um array JSON com esta estrutura:
   }
 });
 
-// POST /books/:id/characters/assign-voices  (atribuição de vozes via IA)
+// POST /books/:id/characters/assign-voices  (sistema automático de 3 camadas)
 router.post("/books/:id/characters/assign-voices", async (req, res): Promise<void> => {
   const bookId = parseInt(req.params.id, 10);
   if (isNaN(bookId)) {
@@ -194,89 +195,115 @@ router.post("/books/:id/characters/assign-voices", async (req, res): Promise<voi
   const characters = await db
     .select()
     .from(charactersTable)
-    .where(eq(charactersTable.bookId, bookId));
+    .where(eq(charactersTable.bookId, bookId))
+    .orderBy(charactersTable.firstAppearanceChapter);
 
   if (characters.length === 0) {
-    res.json({ characters: [], message: "Nenhum personagem encontrado — extraia os personagens primeiro" });
+    res.json({ characters: [], narratorVoice: NARRATOR_VOICE, message: "Nenhum personagem para atribuir vozes" });
     return;
   }
 
-  const charList = characters
-    .map((c) => `ID ${c.id}: ${c.name} | papel: ${c.role ?? "desconhecido"} | gênero: ${c.gender ?? "desconhecido"} | descrição: ${c.description ?? "sem descrição"}`)
-    .join("\n");
+  // ── Sistema de 3 camadas ──────────────────────────────────────────
+  //
+  // Camada 1 — Personagens PRINCIPAIS (protagonist + antagonist)
+  //   → Voz exclusiva e permanente do pool de vozes únicas
+  //
+  // Camada 2 — Personagens SECUNDÁRIOS (supporting)
+  //   → Voz compartilhada por gênero: DEFAULT_MALE/DEFAULT_FEMALE
+  //
+  // Camada 3 — FIGURANTES (minor + unknown)
+  //   → Mesma voz padrão compartilhada por gênero
+  //
+  // Narrador: NARRATOR_VOICE (nunca atribuído a personagens)
+  // ─────────────────────────────────────────────────────────────────
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_completion_tokens: 900,
-      messages: [
-        {
-          role: "system",
-          content: `Você é um diretor de casting para audiolivros em português. Atribua a melhor voz Microsoft Edge Neural (pt-BR) para cada personagem.
+  const usedMaleVoices   = new Set<string>();
+  const usedFemaleVoices = new Set<string>();
 
-VOZES MASCULINAS pt-BR disponíveis: ${MALE_VOICES.join(", ")}
-VOZES FEMININAS pt-BR disponíveis: ${FEMALE_VOICES.join(", ")}
-Narrador/padrão: ${NARRATOR_VOICE}
+  const getNextMainMale = (): string => {
+    for (const v of MAIN_MALE_VOICES) {
+      if (!usedMaleVoices.has(v)) {
+        usedMaleVoices.add(v);
+        return v;
+      }
+    }
+    return DEFAULT_MALE_VOICE;
+  };
 
-REGRAS DE ATRIBUIÇÃO:
-- Use o gênero do personagem para escolher vozes masculinas ou femininas
-- Protagonista: primeira voz da lista (mais neutra/clara) — NUNCA a mesma que o narrador
-- Antagonista masculino: pt-BR-DonatoNeural (grave e sério)
-- Personagens jovens masculinos: pt-BR-FranciscoNeural
-- Personagens veteranos/idosos masculinos: pt-BR-HumbertoNeural
-- Antagonista feminina: pt-BR-ElzaNeural
-- Personagens jovens femininas: pt-BR-GiovannaNeural
-- Cada personagem PRINCIPAL deve ter uma voz ÚNICA
-- Personagens menores podem compartilhar vozes
-- NÃO atribua ${NARRATOR_VOICE} a nenhum personagem (essa é a voz exclusiva do narrador)
+  const getNextMainFemale = (): string => {
+    for (const v of MAIN_FEMALE_VOICES) {
+      if (!usedFemaleVoices.has(v)) {
+        usedFemaleVoices.add(v);
+        return v;
+      }
+    }
+    return DEFAULT_FEMALE_VOICE;
+  };
 
-Retorne um array JSON — uma entrada por ID de personagem:
-[{"id": 1, "assignedVoice": "pt-BR-AntonioNeural", "gender": "male"}]
-Retorne APENAS JSON válido.`,
-        },
-        {
-          role: "user",
-          content: `Livro: "${book.title}"\n\nPersonagens:\n${charList}`,
-        },
-      ],
-    });
+  const assignments: { id: number; voice: string; tier: string }[] = [];
 
-    const raw = completion.choices[0]?.message?.content ?? "[]";
-    let assignments: { id: number; assignedVoice: string; gender?: string }[] = [];
+  for (const char of characters) {
+    const role   = char.role ?? "minor";
+    const gender = (char.gender ?? "unknown").toLowerCase();
+    const isMain = role === "protagonist" || role === "antagonist";
 
-    try {
-      const jsonMatch = raw.match(/\[[\s\S]*\]/);
-      if (jsonMatch) assignments = JSON.parse(jsonMatch[0]);
-    } catch {
-      logger.warn("Falha ao parsear JSON de atribuição de vozes");
+    let voice: string;
+
+    if (isMain) {
+      // Personagem PRINCIPAL — voz exclusiva
+      if (gender === "female") {
+        voice = getNextMainFemale();
+      } else {
+        // male ou unknown → voz masculina
+        voice = getNextMainMale();
+      }
+    } else {
+      // Personagem SECUNDÁRIO ou FIGURANTE — voz compartilhada
+      if (gender === "female") {
+        voice = DEFAULT_FEMALE_VOICE;
+      } else if (gender === "male") {
+        voice = DEFAULT_MALE_VOICE;
+      } else {
+        voice = DEFAULT_UNKNOWN_VOICE;
+      }
     }
 
-    // Aplica atribuições — nunca usa a voz do narrador em personagens
-    for (const assignment of assignments) {
-      if (!assignment.id || !assignment.assignedVoice) continue;
-      const voice = assignment.assignedVoice === NARRATOR_VOICE
-        ? (assignment.gender === "female" ? FEMALE_VOICES[0] : MALE_VOICES[1])
-        : assignment.assignedVoice;
-      await db
-        .update(charactersTable)
-        .set({
-          assignedVoice: voice,
-          gender: assignment.gender ?? null,
-        })
-        .where(eq(charactersTable.id, assignment.id));
+    // Nunca atribui a voz do narrador a um personagem
+    if (voice === NARRATOR_VOICE) {
+      voice = gender === "female" ? DEFAULT_FEMALE_VOICE : DEFAULT_MALE_VOICE;
     }
 
-    const updated = await db
-      .select()
-      .from(charactersTable)
-      .where(eq(charactersTable.bookId, bookId))
-      .orderBy(charactersTable.firstAppearanceChapter);
-
-    res.json({ characters: updated, narratorVoice: NARRATOR_VOICE });
-  } catch (err) {
-    logger.error({ err }, "Falha ao atribuir vozes");
-    res.status(500).json({ error: "Falha ao atribuir vozes" });
+    assignments.push({ id: char.id, voice, tier: isMain ? "main" : role === "supporting" ? "secondary" : "extra" });
   }
+
+  // Persiste as atribuições no banco
+  for (const { id, voice } of assignments) {
+    await db
+      .update(charactersTable)
+      .set({ assignedVoice: voice })
+      .where(eq(charactersTable.id, id));
+  }
+
+  const updated = await db
+    .select()
+    .from(charactersTable)
+    .where(eq(charactersTable.bookId, bookId))
+    .orderBy(charactersTable.firstAppearanceChapter);
+
+  // Resumo para o toast
+  const mainCount      = assignments.filter((a) => a.tier === "main").length;
+  const secondaryCount = assignments.filter((a) => a.tier === "secondary").length;
+  const extraCount     = assignments.filter((a) => a.tier === "extra").length;
+
+  res.json({
+    characters: updated,
+    narratorVoice: NARRATOR_VOICE,
+    summary: {
+      main: mainCount,
+      secondary: secondaryCount,
+      extra: extraCount,
+    },
+  });
 });
 
 export default router;

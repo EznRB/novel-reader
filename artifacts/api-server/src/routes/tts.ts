@@ -4,13 +4,13 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// Voz padrão do narrador (pt-BR, masculino, clara e neutra)
+// Voz fixa do narrador — alta qualidade, excelente para leituras longas
 export const NARRATOR_VOICE = "pt-BR-AntonioNeural";
 
-// Style → prosody adjustments optimizados para pt-BR
+// Style → prosody adjustments para pt-BR
 const STYLE_PROSODY: Record<string, { rateDelta: number; pitch: string; volume?: string }> = {
-  narration:  { rateDelta: 0,   pitch: "+0Hz" },
-  dialogue:   { rateDelta: 8,   pitch: "+3Hz" },
+  narration:  { rateDelta: 0,   pitch: "+0Hz"  },
+  dialogue:   { rateDelta: 8,   pitch: "+3Hz"  },
   cheerful:   { rateDelta: 12,  pitch: "+8Hz",  volume: "+10%" },
   sad:        { rateDelta: -18, pitch: "-5Hz",  volume: "-5%"  },
   excited:    { rateDelta: 20,  pitch: "+12Hz", volume: "+15%" },
@@ -18,17 +18,7 @@ const STYLE_PROSODY: Record<string, { rateDelta: number; pitch: string; volume?:
   whisper:    { rateDelta: -28, pitch: "-4Hz",  volume: "-12%" },
 };
 
-// NVIDIA available voices (Magpie TTS Multilingual)
-const NVIDIA_VOICES = [
-  { id: "male_1",   label: "Masculino — Confiante",  gender: "male"   },
-  { id: "male_2",   label: "Masculino — Grave",       gender: "male"   },
-  { id: "male_3",   label: "Masculino — Jovem",       gender: "male"   },
-  { id: "female_1", label: "Feminino — Clara",        gender: "female" },
-  { id: "female_2", label: "Feminino — Suave",        gender: "female" },
-  { id: "female_3", label: "Feminino — Expressiva",   gender: "female" },
-];
-
-// GET /tts/voices  (msedge voices)
+// GET /tts/voices  (para compatibilidade; frontend não exibe mais seletor)
 router.get("/tts/voices", async (_req, res): Promise<void> => {
   try {
     const tts = new MsEdgeTTS();
@@ -40,12 +30,7 @@ router.get("/tts/voices", async (_req, res): Promise<void> => {
   }
 });
 
-// GET /tts/nvidia-voices
-router.get("/tts/nvidia-voices", (_req, res): void => {
-  res.json(NVIDIA_VOICES);
-});
-
-// POST /tts/synthesize  (msedge-tts)
+// POST /tts/synthesize  (msedge-tts — coleta buffer completo antes de enviar)
 router.post("/tts/synthesize", async (req, res): Promise<void> => {
   const {
     text,
@@ -77,92 +62,37 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
     const tts = new MsEdgeTTS();
     await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
 
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Transfer-Encoding", "chunked");
-
     const options: Record<string, string> = { rate: rateStr, pitch: prosody.pitch };
     if (prosody.volume) options.volume = prosody.volume;
 
-    const { audioStream } = tts.toStream(text, options);
+    const { audioStream } = tts.toStream(text.trim(), options);
 
-    audioStream.on("error", (err) => {
-      logger.error({ err }, "TTS audio stream error");
-      if (!res.headersSent) res.status(500).end();
+    // Coleta TODOS os chunks antes de enviar — garante MP3 completo com duração correta
+    // Isso resolve o bug de áudio parando prematuramente no browser
+    const chunks: Buffer[] = [];
+
+    await new Promise<void>((resolve, reject) => {
+      audioStream.on("data", (chunk: Buffer | string) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      audioStream.on("end", resolve);
+      audioStream.on("error", reject);
     });
 
-    audioStream.pipe(res);
-  } catch (err) {
-    logger.error({ err }, "TTS synthesis failed");
-    if (!res.headersSent) res.status(500).json({ error: "Falha na síntese de voz" });
-  }
-});
+    const audioBuffer = Buffer.concat(chunks);
 
-// POST /tts/nvidia-synthesize  (NVIDIA NIM TTS — alta qualidade)
-router.post("/tts/nvidia-synthesize", async (req, res): Promise<void> => {
-  const {
-    text,
-    voice = "male_1",
-    speed = 1.0,
-    language = "pt-BR",
-  } = req.body as {
-    text?: string;
-    voice?: string;
-    speed?: number;
-    language?: string;
-  };
-
-  if (!text || typeof text !== "string" || text.trim().length === 0) {
-    res.status(400).json({ error: "text é obrigatório" });
-    return;
-  }
-
-  if (text.length > 5000) {
-    res.status(400).json({ error: "text deve ter no máximo 5000 caracteres" });
-    return;
-  }
-
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) {
-    logger.warn("NVIDIA_API_KEY não configurado — NVIDIA TTS indisponível");
-    res.status(503).json({ error: "NVIDIA TTS não configurado" });
-    return;
-  }
-
-  try {
-    const response = await fetch("https://integrate.api.nvidia.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        Accept: "audio/mpeg",
-      },
-      body: JSON.stringify({
-        model: "magpie-tts-multilingual",
-        input: text,
-        voice,
-        response_format: "mp3",
-        speed: Math.max(0.25, Math.min(4.0, Number(speed) || 1.0)),
-        language_code: language,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      logger.error({ status: response.status, body: errText }, "NVIDIA TTS API error");
-      res.status(502).json({ error: `Falha NVIDIA TTS: ${response.status}` });
+    if (audioBuffer.length === 0) {
+      res.status(500).json({ error: "TTS retornou áudio vazio" });
       return;
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
     res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Length", audioBuffer.length);
     res.setHeader("Cache-Control", "no-store");
-    res.end(buffer);
+    res.end(audioBuffer);
   } catch (err) {
-    logger.error({ err }, "NVIDIA TTS synthesis failed");
-    if (!res.headersSent) res.status(500).json({ error: "Falha na síntese NVIDIA TTS" });
+    logger.error({ err }, "TTS synthesis failed");
+    if (!res.headersSent) res.status(500).json({ error: "Falha na síntese de voz" });
   }
 });
 
