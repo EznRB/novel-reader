@@ -4,10 +4,8 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// Voz fixa do narrador — alta qualidade, excelente para leituras longas
 export const NARRATOR_VOICE = "pt-BR-AntonioNeural";
 
-// Style → prosody adjustments para pt-BR
 const STYLE_PROSODY: Record<string, { rateDelta: number; pitch: string; volume?: string }> = {
   narration:  { rateDelta: 0,   pitch: "+0Hz"  },
   dialogue:   { rateDelta: 8,   pitch: "+3Hz"  },
@@ -18,7 +16,66 @@ const STYLE_PROSODY: Record<string, { rateDelta: number; pitch: string; volume?:
   whisper:    { rateDelta: -28, pitch: "-4Hz",  volume: "-12%" },
 };
 
-// GET /tts/voices  (para compatibilidade; frontend não exibe mais seletor)
+/** Sanitiza o texto antes de enviar ao TTS — remove chars que confundem o serviço */
+function sanitizeText(text: string): string {
+  return text
+    .trim()
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/—/g, " - ")
+    .replace(/…/g, "...")
+    .replace(/\s+/g, " ")
+    .substring(0, 4800); // margem de segurança abaixo do limite de 5000
+}
+
+/** Chama msedge-tts com retry automático — trata drops de WebSocket */
+async function synthesizeWithRetry(
+  voice: string,
+  text: string,
+  options: Record<string, string>,
+  maxAttempts = 3,
+): Promise<Buffer> {
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      // backoff exponencial: 400ms, 800ms
+      await new Promise((r) => setTimeout(r, 400 * attempt));
+    }
+    try {
+      const tts = new MsEdgeTTS();
+      await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+
+      const { audioStream } = tts.toStream(text, options);
+      const chunks: Buffer[] = [];
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("TTS stream timeout")), 30_000);
+        audioStream.on("data", (chunk: Buffer | string) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        audioStream.on("end", () => { clearTimeout(timeout); resolve(); });
+        audioStream.on("error", (err) => { clearTimeout(timeout); reject(err); });
+      });
+
+      const buf = Buffer.concat(chunks);
+
+      // Buffer muito pequeno indica dado truncado — forçar retry
+      if (buf.length < 1024) {
+        throw new Error(`Audio buffer too small (${buf.length} bytes) — likely truncated`);
+      }
+
+      return buf;
+    } catch (err) {
+      lastErr = err;
+      logger.warn({ err, attempt, voice }, "TTS attempt failed, retrying...");
+    }
+  }
+
+  throw lastErr;
+}
+
+// GET /tts/voices
 router.get("/tts/voices", async (_req, res): Promise<void> => {
   try {
     const tts = new MsEdgeTTS();
@@ -30,7 +87,7 @@ router.get("/tts/voices", async (_req, res): Promise<void> => {
   }
 });
 
-// POST /tts/synthesize  (msedge-tts — coleta buffer completo antes de enviar)
+// POST /tts/synthesize
 router.post("/tts/synthesize", async (req, res): Promise<void> => {
   const {
     text,
@@ -54,44 +111,23 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
     return;
   }
 
-  const prosody = STYLE_PROSODY[style] ?? STYLE_PROSODY.narration;
+  const cleanText = sanitizeText(text);
+  const prosody   = STYLE_PROSODY[style] ?? STYLE_PROSODY.narration;
   const totalRate = Math.max(-80, Math.min(100, (Number(rate) || 0) + prosody.rateDelta));
-  const rateStr = `${totalRate >= 0 ? "+" : ""}${totalRate}%`;
+  const rateStr   = `${totalRate >= 0 ? "+" : ""}${totalRate}%`;
+
+  const options: Record<string, string> = { rate: rateStr, pitch: prosody.pitch };
+  if (prosody.volume) options.volume = prosody.volume;
 
   try {
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-
-    const options: Record<string, string> = { rate: rateStr, pitch: prosody.pitch };
-    if (prosody.volume) options.volume = prosody.volume;
-
-    const { audioStream } = tts.toStream(text.trim(), options);
-
-    // Coleta TODOS os chunks antes de enviar — garante MP3 completo com duração correta
-    // Isso resolve o bug de áudio parando prematuramente no browser
-    const chunks: Buffer[] = [];
-
-    await new Promise<void>((resolve, reject) => {
-      audioStream.on("data", (chunk: Buffer | string) => {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      });
-      audioStream.on("end", resolve);
-      audioStream.on("error", reject);
-    });
-
-    const audioBuffer = Buffer.concat(chunks);
-
-    if (audioBuffer.length === 0) {
-      res.status(500).json({ error: "TTS retornou áudio vazio" });
-      return;
-    }
+    const audioBuffer = await synthesizeWithRetry(voice, cleanText, options);
 
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Content-Length", audioBuffer.length);
     res.setHeader("Cache-Control", "no-store");
     res.end(audioBuffer);
   } catch (err) {
-    logger.error({ err }, "TTS synthesis failed");
+    logger.error({ err }, "TTS synthesis failed after all retries");
     if (!res.headersSent) res.status(500).json({ error: "Falha na síntese de voz" });
   }
 });

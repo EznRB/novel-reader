@@ -3,14 +3,10 @@
  *
  * - Sem seleção manual de voz: tudo é automático
  * - Voz do narrador fixa (pt-BR-AntonioNeural)
- * - Vozes de personagens atribuídas automaticamente pelo backend
- * - Áudio coletado como buffer completo antes de tocar (corrige paradas prematuras)
+ * - Retry automático (até 2x) em falhas de TTS
+ * - Auto-skip para próxima frase em caso de falha persistente
+ * - AbortController com timeout de 45s por requisição
  * - Pré-carrega a próxima frase durante a reprodução atual
- *
- * Notas de arquitetura:
- * - HTMLAudioElement criado UMA VEZ no mount (deps vazias)
- * - Props atualizadas via refs para evitar fechamentos obsoletos
- * - Nunca recria o elemento Audio durante a reprodução
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
@@ -83,7 +79,6 @@ export interface AudioPlayerProps {
   sentences: string[];
   currentIdx: number;
   onSentenceChange: (idx: number) => void;
-  /** Voz para usar (padrão: pt-BR-AntonioNeural do narrador) */
   voice?: string;
   disabled?: boolean;
   immersive?: boolean;
@@ -92,6 +87,9 @@ export interface AudioPlayerProps {
 }
 
 const NARRATOR_VOICE = "pt-BR-AntonioNeural";
+const FETCH_TIMEOUT_MS = 45_000;
+const MAX_RETRIES = 2;
+const SKIP_DELAY_MS = 600; // pausa breve antes de pular frase com falha
 
 /* ── Componente ── */
 export function AudioPlayer({
@@ -106,9 +104,9 @@ export function AudioPlayer({
 }: AudioPlayerProps) {
   const [status, setStatus]             = useState<PlayerStatus>("idle");
   const [currentStyle, setCurrentStyle] = useState<VoiceStyle>("narration");
-  const [rate, setRate]                 = useState(0); // velocidade em %
+  const [rate, setRate]                 = useState(0);
 
-  /* ── Refs estáveis — atualizados a cada render, nunca obsoletos ── */
+  /* ── Refs estáveis ── */
   const sentencesRef         = useRef(sentences);
   const voiceRef             = useRef(voice);
   const rateRef              = useRef(rate);
@@ -123,14 +121,15 @@ export function AudioPlayer({
   onChapterCompleteRef.current = onChapterComplete;
 
   /* ── Refs de reprodução ── */
-  const audioRef       = useRef<HTMLAudioElement | null>(null);
-  const shouldPlayRef  = useRef(false);
-  const playingIdxRef  = useRef(-1);
-  const currentUrlRef  = useRef<string | null>(null);
-  const prefetchUrlRef = useRef<string | null>(null);
-  const prefetchIdxRef = useRef(-1);
-  const prefetchVoiceRef = useRef(NARRATOR_VOICE);
-  const prefetchStyleRef = useRef("narration");
+  const audioRef          = useRef<HTMLAudioElement | null>(null);
+  const shouldPlayRef     = useRef(false);
+  const playingIdxRef     = useRef(-1);
+  const currentUrlRef     = useRef<string | null>(null);
+  const prefetchUrlRef    = useRef<string | null>(null);
+  const prefetchIdxRef    = useRef(-1);
+  const prefetchVoiceRef  = useRef(NARRATOR_VOICE);
+  const prefetchStyleRef  = useRef("narration");
+  const prefetchAbortRef  = useRef<AbortController | null>(null);
 
   const playSentenceRef = useRef<(idx: number) => void>(() => {});
 
@@ -160,9 +159,18 @@ export function AudioPlayer({
     };
 
     const onError = (e: Event) => {
-      // Ignora erros quando o src está vazio (limpeza normal)
-      if ((e.target as HTMLAudioElement).src === "" || (e.target as HTMLAudioElement).src === window.location.href) return;
-      if (shouldPlayRef.current) setStatus("error");
+      const src = (e.target as HTMLAudioElement).src;
+      if (!src || src === "" || src === window.location.href) return;
+      // Erro durante playback — tenta avançar para próxima frase
+      if (shouldPlayRef.current) {
+        const next = playingIdxRef.current + 1;
+        if (next < sentencesRef.current.length) {
+          setTimeout(() => playSentenceRef.current(next), SKIP_DELAY_MS);
+        } else {
+          shouldPlayRef.current = false;
+          setStatus("error");
+        }
+      }
     };
 
     audio.addEventListener("ended", onEnded);
@@ -176,36 +184,76 @@ export function AudioPlayer({
       audio.removeEventListener("error", onError);
       revokeUrl(currentUrlRef.current);
       revokeUrl(prefetchUrlRef.current);
+      prefetchAbortRef.current?.abort();
     };
   }, []);
 
-  /* ── Busca áudio como buffer completo (resolve paradas prematuras) ── */
-  const fetchAudio = useCallback(async (text: string, style: string, v: string): Promise<string> => {
+  /* ── Busca áudio com retry automático e timeout ── */
+  const fetchAudio = useCallback(async (
+    text: string,
+    style: string,
+    v: string,
+    signal?: AbortSignal,
+  ): Promise<string> => {
     const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
-    const res = await fetch(`${base}/api/tts/synthesize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text:  text.trim(),
-        voice: v,
-        rate:  rateRef.current,
-        style,
-      }),
-    });
-    if (!res.ok) throw new Error(`TTS ${res.status}`);
-    const blob = await res.blob();
-    if (blob.size === 0) throw new Error("Áudio vazio recebido");
-    return URL.createObjectURL(blob);
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+      if (attempt > 0) {
+        // backoff: 500ms, 1000ms
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      // Combina o sinal externo com o timeout
+      signal?.addEventListener("abort", () => controller.abort(), { once: true });
+
+      try {
+        const res = await fetch(`${base}/api/tts/synthesize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: text.trim(), voice: v, rate: rateRef.current, style }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const msg = `TTS ${res.status}`;
+          if (attempt < MAX_RETRIES) { console.warn(`[AudioPlayer] ${msg}, tentativa ${attempt + 1}`); continue; }
+          throw new Error(msg);
+        }
+
+        const blob = await res.blob();
+        if (blob.size < 512) {
+          if (attempt < MAX_RETRIES) { console.warn(`[AudioPlayer] blob muito pequeno (${blob.size}B), retry ${attempt + 1}`); continue; }
+          throw new Error("Áudio vazio recebido");
+        }
+
+        return URL.createObjectURL(blob);
+      } catch (err) {
+        if ((err as Error).name === "AbortError") throw err;
+        if (attempt < MAX_RETRIES) {
+          console.warn(`[AudioPlayer] erro na tentativa ${attempt + 1}:`, err);
+          continue;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    throw new Error("Esgotadas todas as tentativas");
   }, []);
 
   /* ── Para tudo ── */
   const stopAudio = useCallback(() => {
     shouldPlayRef.current = false;
+    prefetchAbortRef.current?.abort();
+    prefetchAbortRef.current = null;
     const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute("src");
-    }
+    if (audio) { audio.pause(); audio.removeAttribute("src"); }
     revokeUrl(currentUrlRef.current);
     revokeUrl(prefetchUrlRef.current);
     currentUrlRef.current  = null;
@@ -216,23 +264,39 @@ export function AudioPlayer({
     setCurrentStyle("narration");
   }, []);
 
-  /* ── Pré-carrega próxima frase ── */
+  /* ── Pré-carrega próxima frase (sem bloquear reprodução) ── */
   const prefetchNext = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
     const v     = voiceRef.current;
     if (idx >= sents.length || !sents[idx]?.trim()) return;
     const style = immersiveRef.current ? detectStyle(sents[idx]) : "narration";
-    if (prefetchIdxRef.current === idx && prefetchVoiceRef.current === v && prefetchStyleRef.current === style && prefetchUrlRef.current) return;
+
+    if (
+      prefetchIdxRef.current === idx &&
+      prefetchVoiceRef.current === v &&
+      prefetchStyleRef.current === style &&
+      prefetchUrlRef.current
+    ) return;
+
+    // Cancela prefetch anterior se ainda em andamento
+    prefetchAbortRef.current?.abort();
+    const abort = new AbortController();
+    prefetchAbortRef.current = abort;
+
     prefetchIdxRef.current   = idx;
     prefetchVoiceRef.current = v;
     prefetchStyleRef.current = style;
+
     try {
-      const url = await fetchAudio(sents[idx], style, v);
+      const url = await fetchAudio(sents[idx], style, v, abort.signal);
+      if (abort.signal.aborted) { revokeUrl(url); return; }
       revokeUrl(prefetchUrlRef.current);
       prefetchUrlRef.current = url;
     } catch {
-      prefetchUrlRef.current = null;
-      prefetchIdxRef.current = -1;
+      if (!abort.signal.aborted) {
+        prefetchUrlRef.current = null;
+        prefetchIdxRef.current = -1;
+      }
     }
   }, [fetchAudio]);
 
@@ -240,6 +304,7 @@ export function AudioPlayer({
   const playSentence = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
     const v     = voiceRef.current;
+
     if (idx >= sents.length || !sents[idx]?.trim()) {
       stopAudio();
       return;
@@ -254,7 +319,7 @@ export function AudioPlayer({
     try {
       let url: string;
 
-      // Usa pré-carregamento se disponível e ainda válido
+      // Usa pré-carregamento se disponível e válido
       if (
         prefetchIdxRef.current   === idx &&
         prefetchVoiceRef.current === v   &&
@@ -265,38 +330,42 @@ export function AudioPlayer({
         prefetchUrlRef.current = null;
         prefetchIdxRef.current = -1;
       } else {
+        // Cancela qualquer prefetch em andamento para evitar requisições concorrentes
+        prefetchAbortRef.current?.abort();
+        prefetchAbortRef.current = null;
         url = await fetchAudio(sents[idx], style, v);
       }
 
-      if (!shouldPlayRef.current) {
-        revokeUrl(url);
-        setStatus("idle");
-        return;
-      }
+      if (!shouldPlayRef.current) { revokeUrl(url); setStatus("idle"); return; }
 
       revokeUrl(currentUrlRef.current);
       currentUrlRef.current = url;
 
       const audio = audioRef.current!;
+
+      // Limpa listeners antigos antes de setar novo src
+      audio.pause();
       audio.src = url;
+      audio.load();
 
-      // Aguarda carregamento completo antes de tocar (evita paradas prematuras)
-      await new Promise<void>((resolve, reject) => {
-        const onReady = () => { cleanup(); resolve(); };
-        const onErr   = () => { cleanup(); reject(new Error("Falha no carregamento")); };
-        const cleanup = () => {
-          audio.removeEventListener("canplaythrough", onReady);
-          audio.removeEventListener("error", onErr);
-        };
-        audio.addEventListener("canplaythrough", onReady, { once: true });
-        audio.addEventListener("error", onErr, { once: true });
-        audio.load();
-      });
+      // Aguarda áudio estar pronto — com fallback por timeout
+      if (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        await new Promise<void>((resolve, reject) => {
+          const cleanup = () => {
+            audio.removeEventListener("canplay", onReady);
+            audio.removeEventListener("error",   onErr);
+          };
+          const onReady = () => { cleanup(); resolve(); };
+          const onErr   = () => { cleanup(); reject(new Error("Audio load error")); };
+          audio.addEventListener("canplay", onReady, { once: true });
+          audio.addEventListener("error",   onErr,   { once: true });
 
-      if (!shouldPlayRef.current) {
-        setStatus("idle");
-        return;
+          // Fallback: se canplay não disparar em 3s, tenta assim mesmo
+          setTimeout(() => { cleanup(); resolve(); }, 3_000);
+        });
       }
+
+      if (!shouldPlayRef.current) { setStatus("idle"); return; }
 
       await audio.play();
       setStatus("playing");
@@ -305,18 +374,30 @@ export function AudioPlayer({
       prefetchNext(idx + 1);
 
     } catch (err) {
-      console.error("[AudioPlayer] erro de reprodução:", err);
+      const name = (err as Error)?.name;
+      if (name === "AbortError") { setStatus("idle"); return; }
+
+      console.error("[AudioPlayer] erro ao reproduzir frase", idx, err);
+
       if (shouldPlayRef.current) {
-        setStatus("error");
+        // Auto-skip: tenta próxima frase em vez de parar
+        const next = playingIdxRef.current + 1;
+        if (next < sentencesRef.current.length) {
+          console.warn(`[AudioPlayer] pulando frase ${idx}, indo para ${next}`);
+          setTimeout(() => {
+            if (shouldPlayRef.current) playSentenceRef.current(next);
+          }, SKIP_DELAY_MS);
+          setStatus("loading");
+        } else {
+          setStatus("error");
+        }
       } else {
         setStatus("idle");
       }
     }
   }, [fetchAudio, stopAudio, prefetchNext]);
 
-  useEffect(() => {
-    playSentenceRef.current = playSentence;
-  }, [playSentence]);
+  useEffect(() => { playSentenceRef.current = playSentence; }, [playSentence]);
 
   /* ── Controles públicos ── */
   const play = useCallback(() => {
@@ -354,7 +435,6 @@ export function AudioPlayer({
     else onSentenceChangeRef.current(newIdx);
   }, [currentIdx, sentences.length]);
 
-  // Para reprodução ao trocar de velocidade
   const handleRateChange = useCallback((newRate: number) => {
     setRate(newRate);
     if (shouldPlayRef.current) stopAudio();
