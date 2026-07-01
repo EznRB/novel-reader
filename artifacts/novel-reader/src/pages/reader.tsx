@@ -20,11 +20,13 @@ import {
   useUpdateReadingProgress,
   useGetChapterSummary,
   useListChapters,
+  useListCharacters,
   getGetChapterQueryKey,
   getGetBookQueryKey,
   getGetReadingProgressQueryKey,
   getGetChapterSummaryQueryKey,
   getListChaptersQueryKey,
+  getListCharactersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AudioPlayer } from "@/components/audio-player";
@@ -43,6 +45,84 @@ function splitSentences(text: string): string[] {
 function readingTime(wordCount: number): string {
   const mins = Math.max(1, Math.round(wordCount / 200));
   return `~${mins} min`;
+}
+
+/* ── Atribuição de fala por personagem ── */
+
+const NARRATOR_VOICE = "pt-BR-AntonioNeural";
+
+// Verbos de atribuição de fala (pt-BR + variantes)
+const ATTR_VERBS =
+  /\b(disse|falou|respondeu|perguntou|gritou|murmurou|sussurrou|exclamou|ordenou|declarou|acrescentou|continuou|interrompeu|afirmou|concordou|discordou|explicou|retrucou|resmungou|implorou|lamentou|admitiu|anunciou|alertou|avisou|gemeu|soluçou|berrou|rugiu|chamou|repetiu|insistiu|comentou|observou|notou|reclamou|chorou|hesitou|cutucou|bufou|suspirou|respondeu|rebateu|prosseguiu)\b/i;
+
+function escapeRe(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Tenta encontrar o nome de um personagem conhecido em um trecho de texto */
+function findSpeakerInText(text: string, names: string[]): string | null {
+  for (const name of names) {
+    // Tenta o nome completo primeiro, depois cada parte com > 2 chars
+    const parts = name.trim().split(/\s+/).filter((p) => p.length > 2);
+    const variants = [name, ...parts];
+    for (const v of variants) {
+      if (new RegExp(`\\b${escapeRe(v)}\\b`, "i").test(text)) return name;
+    }
+  }
+  return null;
+}
+
+/**
+ * Para cada frase, resolve a voz que deve ser usada:
+ * - Narrador: frases de narração
+ * - Voz do personagem: quando a frase é diálogo atribuído a ele
+ *
+ * Padrões detectados (pt-BR):
+ *  1. Mesma frase: "— Texto, disse Klein." → Klein fala
+ *  2. Próxima frase: "— Texto.\n — Klein disse algo." → Klein fala
+ *  3. Frase anterior: "Klein disse: — Texto." → Klein fala
+ */
+function buildSentenceVoices(
+  sentences: string[],
+  charVoiceMap: Record<string, string>, // nome (case-insensitive key) → voiceName
+): string[] {
+  const names = Object.keys(charVoiceMap);
+  if (names.length === 0) return sentences.map(() => NARRATOR_VOICE);
+
+  return sentences.map((s, i) => {
+    const trimmed = s.trim();
+
+    // Detecta se é uma frase de diálogo (começa com travessão ou aspas)
+    const isDialogue =
+      trimmed.startsWith("—") ||
+      trimmed.startsWith("–") ||
+      trimmed.startsWith('"') ||
+      trimmed.startsWith("\u201C"); // "
+
+    if (!isDialogue) return NARRATOR_VOICE;
+
+    // 1. Atribuição inline na mesma frase: "— Texto, disse Klein."
+    if (ATTR_VERBS.test(s)) {
+      const speaker = findSpeakerInText(s, names);
+      if (speaker) return charVoiceMap[speaker] ?? NARRATOR_VOICE;
+    }
+
+    // 2. Atribuição na frase seguinte: "— Texto.\n — Klein disse."
+    const next = sentences[i + 1] ?? "";
+    if (next && ATTR_VERBS.test(next)) {
+      const speaker = findSpeakerInText(next, names);
+      if (speaker) return charVoiceMap[speaker] ?? NARRATOR_VOICE;
+    }
+
+    // 3. Atribuição na frase anterior: "Klein disse: — Texto."
+    const prev = sentences[i - 1] ?? "";
+    if (prev && ATTR_VERBS.test(prev)) {
+      const speaker = findSpeakerInText(prev, names);
+      if (speaker) return charVoiceMap[speaker] ?? NARRATOR_VOICE;
+    }
+
+    return NARRATOR_VOICE;
+  });
 }
 
 /* ── LocalStorage hook ── */
@@ -382,10 +462,32 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   const { data: allChapters } = useListChapters(bookId, {
     query: { enabled: !!bookId && showToc, queryKey: getListChaptersQueryKey(bookId) },
   });
+  const { data: characters } = useListCharacters(bookId, {
+    query: { enabled: !!bookId, queryKey: getListCharactersQueryKey(bookId) },
+  });
   const updateProgress = useUpdateReadingProgress();
 
-  const sentences    = useMemo(() => chapter?.content ? splitSentences(chapter.content) : [], [chapter?.content]);
+  const sentences     = useMemo(() => chapter?.content ? splitSentences(chapter.content) : [], [chapter?.content]);
   const totalChapters = book?.totalChapters ?? 0;
+
+  /**
+   * Mapa nome→voz para personagens com voz atribuída.
+   * Usa o nome original como chave (case-insensitive via findSpeakerInText).
+   */
+  const charVoiceMap = useMemo<Record<string, string>>(() => {
+    if (!characters?.length) return {};
+    return Object.fromEntries(
+      characters
+        .filter((c) => c.assignedVoice && c.name)
+        .map((c) => [c.name, c.assignedVoice as string]),
+    );
+  }, [characters]);
+
+  /** Voz resolvida para cada frase do capítulo */
+  const sentenceVoices = useMemo(
+    () => buildSentenceVoices(sentences, charVoiceMap),
+    [sentences, charVoiceMap],
+  );
 
   void progress;
 
@@ -641,6 +743,7 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
             <div className="max-w-3xl mx-auto">
               <AudioPlayer
                 sentences={sentences}
+                voices={sentenceVoices}
                 currentIdx={currentSentence}
                 onSentenceChange={setCurrentSentence}
                 disabled={chapterLoading || !chapter}

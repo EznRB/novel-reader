@@ -80,6 +80,8 @@ export interface AudioPlayerProps {
   currentIdx: number;
   onSentenceChange: (idx: number) => void;
   voice?: string;
+  /** Voz por índice de frase — sobrescreve `voice` quando fornecida */
+  voices?: string[];
   disabled?: boolean;
   immersive?: boolean;
   onPlayingChange?: (playing: boolean) => void;
@@ -97,6 +99,7 @@ export function AudioPlayer({
   currentIdx,
   onSentenceChange,
   voice = NARRATOR_VOICE,
+  voices,
   disabled,
   immersive = false,
   onPlayingChange,
@@ -109,16 +112,23 @@ export function AudioPlayer({
   /* ── Refs estáveis ── */
   const sentencesRef         = useRef(sentences);
   const voiceRef             = useRef(voice);
+  const voicesRef            = useRef(voices);
   const rateRef              = useRef(rate);
   const immersiveRef         = useRef(immersive);
   const onSentenceChangeRef  = useRef(onSentenceChange);
   const onChapterCompleteRef = useRef(onChapterComplete);
   sentencesRef.current         = sentences;
   voiceRef.current             = voice;
+  voicesRef.current            = voices;
   rateRef.current              = rate;
   immersiveRef.current         = immersive;
   onSentenceChangeRef.current  = onSentenceChange;
   onChapterCompleteRef.current = onChapterComplete;
+
+  /** Retorna a voz para o índice de frase — usa vozes por frase se disponível */
+  const getVoiceForIdx = useCallback((idx: number): string => {
+    return voicesRef.current?.[idx] ?? voiceRef.current;
+  }, []);
 
   /* ── Refs de reprodução ── */
   const audioRef          = useRef<HTMLAudioElement | null>(null);
@@ -267,7 +277,7 @@ export function AudioPlayer({
   /* ── Pré-carrega próxima frase (sem bloquear reprodução) ── */
   const prefetchNext = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
-    const v     = voiceRef.current;
+    const v     = getVoiceForIdx(idx);
     if (idx >= sents.length || !sents[idx]?.trim()) return;
     const style = immersiveRef.current ? detectStyle(sents[idx]) : "narration";
 
@@ -298,12 +308,12 @@ export function AudioPlayer({
         prefetchIdxRef.current = -1;
       }
     }
-  }, [fetchAudio]);
+  }, [fetchAudio, getVoiceForIdx]);
 
   /* ── Toca uma frase específica ── */
   const playSentence = useCallback(async (idx: number) => {
     const sents = sentencesRef.current;
-    const v     = voiceRef.current;
+    const v     = getVoiceForIdx(idx);
 
     if (idx >= sents.length || !sents[idx]?.trim()) {
       stopAudio();
@@ -395,7 +405,7 @@ export function AudioPlayer({
         setStatus("idle");
       }
     }
-  }, [fetchAudio, stopAudio, prefetchNext]);
+  }, [fetchAudio, stopAudio, prefetchNext, getVoiceForIdx]);
 
   useEffect(() => { playSentenceRef.current = playSentence; }, [playSentence]);
 
