@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import debounce from "lodash/debounce";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -494,13 +495,23 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   // Reset ao trocar de capítulo
   useEffect(() => { setCurrentSentence(0); }, [chapterNumber]);
 
-  // Salva progresso ao visitar
+  // Salva progresso ao visitar (debounced)
+  const debouncedSaveProgress = useMemo(() => {
+    // 500 ms debounce – reduz chamadas DB ao mudar rapidamente de capítulos
+    const fn = debounce((bkId: number, chNum: number) => {
+      updateProgress.mutate(
+        { id: bkId, data: { currentChapter: chNum, characterPosition: 0 } },
+        { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bkId) }) }
+      );
+    }, 500);
+    return fn;
+  }, [updateProgress, queryClient]);
+
   useEffect(() => {
     if (!bookId || !chapterNumber) return;
-    updateProgress.mutate(
-      { id: bookId, data: { currentChapter: chapterNumber, characterPosition: 0 } },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetReadingProgressQueryKey(bookId) }) }
-    );
+    debouncedSaveProgress(bookId, chapterNumber);
+    // cleanup on unmount
+    return () => debouncedSaveProgress.cancel();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterNumber, bookId]);
 

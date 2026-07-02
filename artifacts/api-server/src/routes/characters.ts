@@ -6,6 +6,7 @@ import {
   ExtractCharactersParams,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -98,7 +99,7 @@ router.post("/books/:id/characters", async (req, res): Promise<void> => {
     .join("\n\n---\n\n");
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await withRateLimit(() => openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_completion_tokens: 2000,
       messages: [

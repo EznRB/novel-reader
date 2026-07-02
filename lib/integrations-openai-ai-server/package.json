@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "jest"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./batch": "./src/batch/index.ts",
@@ -12,7 +15,8 @@
   "dependencies": {
     "openai": "^6.27.0",
     "p-limit": "^7.3.0",
-    "p-retry": "^7.1.1"
+    "p-retry": "^7.1.1",
+    "bottleneck": "^2.19.5"
   },
   "devDependencies": {
     "@types/node": "catalog:"

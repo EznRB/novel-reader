@@ -7,6 +7,7 @@ import {
   GetChapterSummaryParams,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -110,7 +111,7 @@ router.get("/books/:id/chapters/:chapterNumber/summary", async (req, res): Promi
   const chapterLabel = `Capítulo ${params.data.chapterNumber}${chapter.title ? ` — ${chapter.title}` : ""}`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await withRateLimit(() => openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_completion_tokens: 1100,
       messages: [

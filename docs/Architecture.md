@@ -32,3 +32,4 @@ NoveLit é uma aplicação web single‑user para leitura de romances digitais, 
 | API Server | Rotas REST, validação, IA/TTS orchestration, cache persistence |
 | Banco de Dados | Armazenamento de livros, capítulos, progresso, caches de IA |
 | IA/TTS | Prompt construction, batch processing, retry, result caching |
+| TTS | `TTSProvider` abstraction, `EdgeTTSProvider` implementation, audio cache on disk |

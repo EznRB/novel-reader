@@ -21,3 +21,8 @@
 
 ## Vozes disponíveis
 `GET /api/tts/voices` lista vozes Edge; a camada de voz de personagens utiliza pools definidos no backend (`MAIN_MALE_VOICES`, `DEFAULT_FEMALE_VOICE`, …).
+
+## Provider abstraction & persistent cache
+
+The TTS subsystem now uses a **provider abstraction** (`TTSProvider`) which allows different TTS back‑ends. The default `EdgeTTSProvider` implements Azure Edge TTS. Audio data is cached on disk via `LocalDiskProvider` in `cache/tts`, enabling reuse across requests and server restarts.
+`GET /api/tts/voices` lista vozes Edge; a camada de voz de personagens utiliza pools definidos no backend (`MAIN_MALE_VOICES`, `DEFAULT_FEMALE_VOICE`, …).

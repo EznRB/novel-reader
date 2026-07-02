@@ -6,6 +6,7 @@ import {
   AskAboutBookBody,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -57,7 +58,7 @@ router.post("/books/:id/ask", async (req, res): Promise<void> => {
     .slice(0, 20000);
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await withRateLimit(() => openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_completion_tokens: 800,
       messages: [
