@@ -1,20 +1,18 @@
 {
   "version": 2,
-  "buildCommand": "pnpm install --frozen-lockfile && pnpm run typecheck:libs && pnpm --filter @workspace/novel-reader run build",
-  "outputDirectory": "artifacts/novel-reader/dist/public",
-  "framework": null,
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "https://YOUR_API_DOMAIN/api/:path*"
+      "src": "artifacts/novel-reader/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "artifacts/api-server/src/index.ts",
+      "use": "@vercel/node"
     }
   ],
-  "env": {
-    "PORT": "3000",
-    "BASE_PATH": "/"
-  }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/artifacts/api-server/src/index.ts" },
+    { "src": "/(.*)", "dest": "/artifacts/novel-reader/$1" }
+  ]
 }
