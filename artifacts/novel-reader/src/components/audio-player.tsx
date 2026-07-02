@@ -9,6 +9,7 @@
  * - Pré-carrega a próxima frase durante a reprodução atual
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { ENABLE_BLOCK_AUDIO } from "@workspace/config/featureFlags";
 import {
   Play, Pause, Square, SkipBack, SkipForward,
   Loader2, Sparkles, Gauge,
@@ -217,15 +218,24 @@ export function AudioPlayer({
       }
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      // Estimate timeout based on text length (words) → approx audio duration
+        const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+        // Rough speech speed: 2.5 words/s (150 wpm)
+        const estimatedSec = wordCount / 2.5;
+        const estimatedMs = Math.max(5_000, Math.ceil(estimatedSec * 1_000) + 2_000); // min 5s, +2s buffer
+        const timer = setTimeout(() => controller.abort(), estimatedMs);
       // Combina o sinal externo com o timeout
       signal?.addEventListener("abort", () => controller.abort(), { once: true });
 
       try {
-        const res = await fetch(`${base}/api/tts/synthesize`, {
+        const endpoint = ENABLE_BLOCK_AUDIO ? `${base}/api/tts/batch` : `${base}/api/tts/synthesize`;
+        const payload = ENABLE_BLOCK_AUDIO
+          ? { sentences: [text.trim()], voice: v, rate: rateRef.current, style }
+          : { text: text.trim(), voice: v, rate: rateRef.current, style };
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: text.trim(), voice: v, rate: rateRef.current, style }),
+            body: JSON.stringify(payload),
           signal: controller.signal,
         });
 

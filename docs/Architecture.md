@@ -23,7 +23,7 @@ NoveLit é uma aplicação web single‑user para leitura de romances digitais, 
 - Frontend <-> API Server: HTTP/JSON
 - API Server <-> PostgreSQL: Drizzle ORM
 - API Server <-> NVIDIA NIM: OpenAI‑compatible client (endpoint `https://integrate.api.nvidia.com/v1`)
-- TTS: local `MsEdgeTTS` (future NVIDIA voice service)
+- TTS: local ``TTSProvider` abstraction (default `EdgeTTSProvider`)` (future NVIDIA voice service)
 
 ## Responsabilidades por camada
 | Camada | Responsabilidade |

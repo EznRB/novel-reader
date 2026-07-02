@@ -14,6 +14,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { useAudioBlocks } from "@/hooks/useAudioBlock";
 import {
   useGetChapter,
   useGetBook,
@@ -468,7 +469,11 @@ export default function ReaderPage({ params }: { params: { id: string; num: stri
   });
   const updateProgress = useUpdateReadingProgress();
 
-  const sentences     = useMemo(() => chapter?.content ? splitSentences(chapter.content) : [], [chapter?.content]);
+
+
+// Compute audio blocks (≈ 300 words each) and use them as the sentence source
+const { blocks } = useAudioBlocks(chapter?.content ?? "", 300);
+const sentences = blocks.map(b => b.text);
   const totalChapters = book?.totalChapters ?? 0;
 
   /**

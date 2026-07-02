@@ -6,6 +6,7 @@ import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { rateLimitMiddleware } from "./middleware/rateLimit";
 
 const app: Express = express();
 
@@ -31,9 +32,20 @@ app.use(
 
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
-app.use(express.json({ limit: "50mb" }));
+import csurf from "csurf";
+// CSRF protection – only for state‑changing routes (POST/PUT/DELETE)
+const csrfProtection = csurf({ cookie: true });
+app.use((req, res, next) => {
+  // Apply CSRF only on mutating methods
+  if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
+    return csrfProtection(req, res, next);
+  }
+  next();
+});
+app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(authMiddleware);
+app.use(rateLimitMiddleware);
 
 app.use("/api", router);
 

@@ -4,7 +4,7 @@
 - Express 5
 - TypeScript
 - Drizzle ORM (PostgreSQL)
-- `MsEdgeTTS` (local TTS)
+- TTS via `TTSProvider` abstraction (default `EdgeTTSProvider`), with persistent audio cache
 - NVIDIA NIM (IA) via OpenAI‑compatible SDK
 
 ## Principais rotas

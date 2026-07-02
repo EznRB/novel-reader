@@ -5,3 +5,5 @@ export * from "./reading_progress";
 export * from "./chapter_summaries";
 export * from "./characters";
 export * from "./book_knowledge";
+export * from "./audio_cache";
+export * from "./ai_cache";

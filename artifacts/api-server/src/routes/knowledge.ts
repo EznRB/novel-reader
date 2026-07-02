@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, eq, lte } from "drizzle-orm";
 import { db, booksTable, chaptersTable, bookKnowledgeTable, readingProgressTable } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -71,7 +72,7 @@ router.post("/books/:id/knowledge/extract", async (req, res): Promise<void> => {
     .join("\n\n---\n\n");
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await withRateLimit(() => openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_completion_tokens: 2800,
       messages: [
@@ -158,7 +159,7 @@ Retorne um objeto JSON com estes arrays (inclua apenas entidades que claramente 
               : null,
           lastMentionedChapter: upToChapter,
           metadata: Object.keys(item).length > 0 ? item : null,
-        });
+    }));
       }
     }
 

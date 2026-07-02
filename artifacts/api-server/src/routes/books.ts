@@ -12,6 +12,11 @@ import {
 
 const router: IRouter = Router();
 
+function sanitizeImportedContent(content: string): string {
+  // Remove any HTML tags to prevent XSS when stored/rendered later
+  return content.replace(/<[^>]*>/g, "");
+}
+
 function parseChapters(content: string): { chapterNumber: number; title: string | null; content: string }[] {
   // Try to split on common chapter patterns
   const chapterPattern = /(?:^|\n)(Chapter\s+\d+[^\n]*|CHAPTER\s+\d+[^\n]*|\d+\.\s+[^\n]{0,80})/gi;
@@ -67,7 +72,8 @@ router.post("/books", async (req, res): Promise<void> => {
   }
 
   const { content, title, author, description, tags } = parsed.data;
-  const chapters = parseChapters(content);
+  const safeContent = sanitizeImportedContent(content);
+  const chapters = parseChapters(safeContent);
   const totalWords = chapters.reduce((sum, c) => sum + countWords(c.content), 0);
 
   const [book] = await db

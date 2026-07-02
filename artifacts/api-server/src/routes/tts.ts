@@ -1,8 +1,17 @@
 import { Router, type IRouter } from "express";
-import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { EdgeTTSProvider, NvidiaTTSProvider } from "../../../lib/tts/provider";
+import { LocalDiskProvider } from "../../../lib/audio/provider/LocalDiskProvider";
+import { createHash } from "crypto";
 import { logger } from "../lib/logger";
+import { ENABLE_EXPERIMENTAL_FEATURES } from "../../../lib/config/featureFlags";
 
 const router: IRouter = Router();
+
+// Storage provider for cached audio files (disk based)
+const audioStorage = new LocalDiskProvider();
+
+// TTS provider abstraction (currently Edge implementation)
+let ttsProvider = ENABLE_EXPERIMENTAL_FEATURES ? new NvidiaTTSProvider() : new EdgeTTSProvider();
 
 export const NARRATOR_VOICE = "pt-BR-AntonioNeural";
 
@@ -21,58 +30,11 @@ function sanitizeText(text: string): string {
   return text
     .trim()
     .replace(/[""]/g, '"')
-    .replace(/['']/g, "'")
+    .replace(/[\'\']/g, "'")
     .replace(/—/g, " - ")
     .replace(/…/g, "...")
     .replace(/\s+/g, " ")
     .substring(0, 4800); // margem de segurança abaixo do limite de 5000
-}
-
-/** Chama msedge-tts com retry automático — trata drops de WebSocket */
-async function synthesizeWithRetry(
-  voice: string,
-  text: string,
-  options: Record<string, string>,
-  maxAttempts = 3,
-): Promise<Buffer> {
-  let lastErr: unknown;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (attempt > 0) {
-      // backoff exponencial: 400ms, 800ms
-      await new Promise((r) => setTimeout(r, 400 * attempt));
-    }
-    try {
-      const tts = new MsEdgeTTS();
-      await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-
-      const { audioStream } = tts.toStream(text, options);
-      const chunks: Buffer[] = [];
-
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("TTS stream timeout")), 30_000);
-        audioStream.on("data", (chunk: Buffer | string) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-        audioStream.on("end", () => { clearTimeout(timeout); resolve(); });
-        audioStream.on("error", (err) => { clearTimeout(timeout); reject(err); });
-      });
-
-      const buf = Buffer.concat(chunks);
-
-      // Buffer muito pequeno indica dado truncado — forçar retry
-      if (buf.length < 1024) {
-        throw new Error(`Audio buffer too small (${buf.length} bytes) — likely truncated`);
-      }
-
-      return buf;
-    } catch (err) {
-      lastErr = err;
-      logger.warn({ err, attempt, voice }, "TTS attempt failed, retrying...");
-    }
-  }
-
-  throw lastErr;
 }
 
 // GET /tts/voices
@@ -86,6 +48,67 @@ router.get("/tts/voices", async (_req, res): Promise<void> => {
     res.status(500).json({ error: "Falha ao buscar vozes" });
   }
 });
+
+// POST /tts/batch – gera áudio único para múltiplas frases (cache em disco)
+router.post("/tts/batch", async (req, res): Promise<void> => {
+  const {
+    sentences,
+    voice = NARRATOR_VOICE,
+    rate = 0,
+    style = "narration",
++  } = req.body as {
++    sentences?: string[];
++    voice?: string;
++    rate?: number;
++    style?: string;
++  };
++
++  if (!Array.isArray(sentences) || sentences.length === 0) {
++    res.status(400).json({ error: "sentences array is required" });
++    return;
++  }
++
++  // sanitiza cada sentença individualmente (mantém limite de 4800 chars por frase)
++  const cleanSentences = sentences.map(sanitizeText);
++  const prosody = STYLE_PROSODY[style] ?? STYLE_PROSODY.narration;
++  const totalRate = Math.max(-80, Math.min(100, (Number(rate) || 0) + prosody.rateDelta));
++  const rateStr = `${totalRate >= 0 ? "+" : ""}${totalRate}%`;
++  const options: Record<string, string> = { rate: rateStr, pitch: prosody.pitch };
++  if (prosody.volume) options.volume = prosody.volume;
++
++  // chave única baseada no conteúdo das frases + parâmetros
++  const cacheKey = createHash('sha256')
++    .update(voice)
++    .update(JSON.stringify(cleanSentences))
++    .update(JSON.stringify(options))
++    .digest('hex');
++  const cachePath = `${cacheKey}.mp3`;
++
++  // tenta servir do cache
++  if (await audioStorage.exists(cachePath)) {
++    const cached = await audioStorage.read(cachePath);
++    res.setHeader('Content-Type', 'audio/mpeg');
++    res.setHeader('Content-Length', cached.length);
++    res.setHeader('Cache-Control', 'public, max-age=86400');
++    res.end(cached);
++    return;
++  }
++
++  // gera áudio de cada sentença sequencialmente (para garantir ordem e rate‑limit)
++  const buffers: Buffer[] = [];
++  for (const sentence of cleanSentences) {
++    const buf = await synthesizeWithRetry(voice, sentence, options);
++    buffers.push(buf);
++  }
++  const combined = Buffer.concat(buffers);
++  // persiste no cache
++  await audioStorage.save(cachePath, combined);
++
++  res.setHeader('Content-Type', 'audio/mpeg');
++  res.setHeader('Content-Length', combined.length);
++  res.setHeader('Cache-Control', 'no-store');
++  res.end(combined);
++});
 
 // POST /tts/synthesize
 router.post("/tts/synthesize", async (req, res): Promise<void> => {
@@ -120,15 +143,37 @@ router.post("/tts/synthesize", async (req, res): Promise<void> => {
   if (prosody.volume) options.volume = prosody.volume;
 
   try {
-    const audioBuffer = await synthesizeWithRetry(voice, cleanText, options);
+    // Compute deterministic cache key based on input parameters
+    const cacheKey = createHash('sha256')
+      .update(voice)
+      .update(cleanText)
+      .update(JSON.stringify(options))
+      .digest('hex');
+    const cachePath = `${cacheKey}.mp3`;
 
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Content-Length", audioBuffer.length);
-    res.setHeader("Cache-Control", "no-store");
+    // Try to serve from cache first
+    if (await audioStorage.exists(cachePath)) {
+      const cachedBuffer = await audioStorage.read(cachePath);
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', cachedBuffer.length);
+      // Allow browsers to cache (client-side) – we control server-side via our own cache
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.end(cachedBuffer);
+      return;
+    }
+
+    // Not cached – generate via TTS and then store
+    const audioBuffer = await synthesizeWithRetry(voice, cleanText, options);
+    // Persist to disk cache (non‑blocking, but we await to guarantee persistence)
+    await audioStorage.save(cachePath, audioBuffer);
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', audioBuffer.length);
+    res.setHeader('Cache-Control', 'no-store');
     res.end(audioBuffer);
   } catch (err) {
-    logger.error({ err }, "TTS synthesis failed after all retries");
-    if (!res.headersSent) res.status(500).json({ error: "Falha na síntese de voz" });
+    logger.error({ err }, 'TTS synthesis failed after all retries');
+    if (!res.headersSent) res.status(500).json({ error: 'Falha na síntese de voz' });
   }
 });
 
