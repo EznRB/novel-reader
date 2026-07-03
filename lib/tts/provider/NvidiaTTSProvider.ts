@@ -1,7 +1,7 @@
 import { TTSProvider } from "./TTSProvider";
 import { logger } from "../../../artifacts/api-server/src/lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
+import { withRateLimit } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
 
 /**
  * NVIDIA NIM TTS provider implementation.

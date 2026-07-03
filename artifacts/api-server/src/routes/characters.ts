@@ -6,7 +6,7 @@ import {
   ExtractCharactersParams,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
+import { withRateLimit } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -132,7 +132,7 @@ Retorne APENAS JSON válido sem markdown:
           content: combinedText,
         },
       ],
-    });
+    }));
 
     const content = completion.choices[0]?.message?.content ?? "[]";
     let extracted: {

@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, eq, lte } from "drizzle-orm";
 import { db, booksTable, chaptersTable, bookKnowledgeTable, readingProgressTable } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
+import { withRateLimit } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -102,7 +102,7 @@ Retorne um objeto JSON com estes arrays (inclua apenas entidades que claramente 
           content: combinedText,
         },
       ],
-    });
+    }));
 
     const content = completion.choices[0]?.message?.content ?? "{}";
     let extracted: Record<string, Array<Record<string, unknown>>> = {};

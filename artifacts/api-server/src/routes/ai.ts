@@ -6,7 +6,7 @@ import {
   AskAboutBookBody,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { withRateLimit } from "../../../lib/integrations-openai-ai-server/src/rateLimiter";
+import { withRateLimit } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -74,7 +74,7 @@ Do not speculate or invent information beyond what is in the text.`,
           content: `Context (chapters 1-${upToChapter}):\n\n${context}\n\n---\n\nQuestion: ${parsed.data.question}`,
         },
       ],
-    });
+    }));
 
     const answer = completion.choices[0]?.message?.content ?? "I couldn't generate an answer.";
 
