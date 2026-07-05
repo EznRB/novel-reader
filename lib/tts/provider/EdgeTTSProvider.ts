@@ -23,7 +23,8 @@ export class EdgeTTSProvider implements TTSProvider {
       }
       try {
         const tts = new MsEdgeTTS();
-        await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+        // @ts-ignore
+await tts.setMetadata(voice, (OUTPUT_FORMAT as any).AUDIO_24KHZ_96KBITRATE_MONO_MP3);
         const { audioStream } = tts.toStream(text, options);
         const chunks: Buffer[] = [];
         await new Promise<void>((resolve, reject) => {

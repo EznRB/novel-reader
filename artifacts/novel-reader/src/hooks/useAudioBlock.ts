@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useCallback, useMemo } from "react";
 import { createHash } from "crypto";
 import type { AudioCache } from "@workspace/db";

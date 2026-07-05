@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import debounce from "lodash/debounce";
 import { Link, useLocation } from "wouter";

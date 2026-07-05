@@ -33,13 +33,13 @@ app.use(
 
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
-import csurf from "csurf";
 // CSRF protection – only for state‑changing routes (POST/PUT/DELETE)
 const csrfProtection = csurf({ cookie: true });
 app.use((req, res, next) => {
   // Apply CSRF only on mutating methods
   if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
-    return csrfProtection(req, res, next);
+    csrfProtection(req, res, next);
+    return;
   }
   next();
 });

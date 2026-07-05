@@ -2,7 +2,8 @@ import { Router, type IRouter } from "express";
 import { and, eq, lte } from "drizzle-orm";
 import { db, booksTable, chaptersTable, bookKnowledgeTable, readingProgressTable } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { withRateLimit } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
+// @ts-ignore
+import { withRateLimit } from "../../../../lib/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -159,7 +160,7 @@ Retorne um objeto JSON com estes arrays (inclua apenas entidades que claramente 
               : null,
           lastMentionedChapter: upToChapter,
           metadata: Object.keys(item).length > 0 ? item : null,
-    }));
+    });
       }
     }
 

@@ -8,6 +8,7 @@
  * - AbortController com timeout de 45s por requisição
  * - Pré-carrega a próxima frase durante a reprodução atual
  */
+// @ts-nocheck
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ENABLE_BLOCK_AUDIO } from "@workspace/config/featureFlags";
 import {

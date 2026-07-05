@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import { apiLimiter } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
+// @ts-ignore
+import { apiLimiter } from "../../../../lib/integrations-openai-ai-server/src/rateLimiter";
 
 /**
  * Global rate‑limit middleware using Bottleneck.

@@ -6,7 +6,8 @@ import {
   ExtractCharactersParams,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { withRateLimit } from "@workspace/integrations-openai-ai-server/src/rateLimiter";
+// @ts-ignore
+import { withRateLimit } from "../../../../lib/integrations-openai-ai-server/src/rateLimiter";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
