@@ -4,7 +4,7 @@
     {
       "src": "artifacts/novel-reader/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist/public" }
+      "config": { "outputDirectory": "dist/public" }
     },
     {
       "src": "artifacts/api-server/src/index.ts",
