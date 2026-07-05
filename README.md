@@ -18,6 +18,8 @@ A personal novel reading web app with a dark navy UI, immersive TTS reader, AI s
 - **Profile** — Replit Auth sign-in, reading stats
 
 ### Keyboard Shortcuts (Reader)
+
+<!-- redeploy trigger -->
 | Key | Action |
 |-----|--------|
 | `Space` | Play / Pause |
