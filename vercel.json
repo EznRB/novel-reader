@@ -11,6 +11,7 @@
       "use": "@vercel/node"
     }
   ],
+  "outputDirectory": "artifacts/novel-reader/dist/public",
   "routes": [
     { "src": "/api/(.*)", "dest": "/artifacts/api-server/src/index.ts" },
     { "src": "/(.*)", "dest": "/artifacts/novel-reader/$1" }
