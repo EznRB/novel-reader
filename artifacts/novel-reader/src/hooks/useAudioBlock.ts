@@ -1,8 +1,21 @@
 // @ts-nocheck
 import { useCallback, useMemo } from "react";
-import { createHash } from "crypto";
+
 import type { AudioCache } from "@workspace/db";
-import { logger } from "../lib/logger";
+const logger = {
+  error: (...args:any[]) => console.error(...args),
+  warn: (...args:any[]) => console.warn(...args),
+  info: (...args:any[]) => console.info(...args),
+};
+
+function simpleHash(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash.toString(16);
+}
 
 /**
  * Divide a large text into smaller blocks (roughly 30‑90 seconds of speech).
@@ -18,7 +31,7 @@ export function useAudioBlocks(text: string, maxWords = 300) {
     for (let i = 0; i < words.length; i += maxWords) {
       const slice = words.slice(i, i + maxWords);
       const blockText = slice.join(" ");
-      const hash = createHash("sha256").update(blockText).digest("hex");
+      const hash = simpleHash(blockText);
       result.push({ text: blockText, hash });
     }
     return result;

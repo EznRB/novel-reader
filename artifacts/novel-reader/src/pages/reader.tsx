@@ -1,6 +1,15 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import debounce from "lodash/debounce";
+// Simple debounce implementation (replaces lodash/debounce)
+const debounce = (fn: (...args: any[]) => any, wait = 500) => {
+  let timeout: any;
+  const debounced: any = (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
+  debounced.cancel = () => clearTimeout(timeout);
+  return debounced;
+};
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {

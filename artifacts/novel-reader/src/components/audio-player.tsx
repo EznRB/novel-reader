@@ -10,7 +10,7 @@
  */
 // @ts-nocheck
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ENABLE_BLOCK_AUDIO } from "@workspace/config/featureFlags";
+const ENABLE_BLOCK_AUDIO = true; // Stubbed config flag
 import {
   Play, Pause, Square, SkipBack, SkipForward,
   Loader2, Sparkles, Gauge,
